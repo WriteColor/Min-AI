@@ -33,4 +33,4 @@ Un poderoso asistente virtual avanzado para escritorio inspirado en la IA de Mar
 Este proyecto usa tu configuración local en `config/api_keys.json` para gestionar llaves maestras de API. Este archivo **no debe subirse** a GitHub bajo ningún concepto, por lo cual ya viene protegido automáticamente por el `.gitignore` nativo de esta rama.
 
 ---
-*Desarrollado y mantenido con Inteligencia Artificial Avanzada.*
+*Desarrollado y mantenido con IA & 2PAC.*
