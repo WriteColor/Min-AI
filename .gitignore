@@ -10,6 +10,9 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+# Exception: these modules are distributed as compiled-only (no .py source)
+!ui.pyc
+!file_events.pyc
 
 # Config and Sensitive Files
 config/api_keys.json
