@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from beta_config import is_pro_tool, check_daily_limit, increment_calls, pro_tool_message, daily_limit_message
 import os
 import re
@@ -7,6 +8,9 @@ import json
 import sys
 import traceback
 from pathlib import Path
+
+# ── Dedicated thread pool for tool execution — prevents starvation ────────────
+_TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="jarvis-tool")
 
 try:
     from zoneinfo import ZoneInfo as _ZoneInfo
@@ -360,9 +364,15 @@ RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 256      # 16ms chunks — mic input (keep small for low latency)
 PLAY_CHUNK_SIZE     = 480      # 20ms chunks — playback (smaller = lower latency)
 
+_cached_api_key: str | None = None
+
 def _get_api_key() -> str:
+    global _cached_api_key
+    if _cached_api_key:
+        return _cached_api_key
     with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+        _cached_api_key = json.load(f)["gemini_api_key"]
+    return _cached_api_key
 
 
 JARVIS_VOICES = {
@@ -1630,17 +1640,33 @@ TOOL_DECLARATIONS = [
     {
         "name": "terminal_agent",
         "description": (
-            "Ejecuta comandos crudos en la consola de Windows (PowerShell/CMD). "
-            "USAR EXCLUSIVAMENTE para desinstalar programas (winget uninstall), matar procesos forzados, "
-            "manejar el sistema de archivos a bajo nivel, o ejecutar comandos técnicos explícitos. "
-            "ADVERTENCIA: Acción peligrosa. Úsala solo si estás seguro del comando."
+            "Ejecuta CUALQUIER comando en la terminal de Windows (PowerShell o CMD). "
+            "USAR LIBREMENTE como recurso general para CUALQUIER tarea del sistema operativo: "
+            "instalar/desinstalar programas (winget, choco, pip), consultar información del sistema, "
+            "ejecutar scripts, manejar archivos y carpetas, configurar redes, descargar archivos, "
+            "compilar código, matar procesos, gestionar servicios, y CUALQUIER otra operación. "
+            "Si no sabés cómo hacer algo con las herramientas existentes, SIEMPRE intentá resolverlo "
+            "con un comando de terminal antes de decir que no podés. "
+            "Es tu recurso de último recurso universal."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
                 "command": {
                     "type": "STRING",
-                    "description": "El comando exacto a ejecutar en PowerShell"
+                    "description": "El comando exacto a ejecutar"
+                },
+                "shell": {
+                    "type": "STRING",
+                    "description": "Shell a usar: powershell (default) o cmd"
+                },
+                "timeout": {
+                    "type": "INTEGER",
+                    "description": "Timeout en segundos (default: 120, max: 600)"
+                },
+                "working_directory": {
+                    "type": "STRING",
+                    "description": "Directorio de trabajo para el comando (opcional)"
                 }
             },
             "required": ["command"]
@@ -1864,6 +1890,59 @@ TOOL_DECLARATIONS = [
             "required": ["action", "tool_name"]
         }
     },
+    {
+        "name": "self_edit",
+        "description": (
+            "Auto-edición de código: JARVIS puede leer, modificar, crear y gestionar sus propios archivos de código fuente. "
+            "Crea backups automáticos antes de cada cambio. "
+            "USAR cuando el usuario pida: 'editá tu código', 'cambiá tu prompt', 'agregá esta función', "
+            "'modificá tu comportamiento', 'mejorate', 'aprendé a hacer X editando tu código', "
+            "o cuando JARVIS necesite auto-mejorarse, corregir bugs propios o agregar capacidades. "
+            "Puede editar: main.py, core/prompt.txt, actions/*.py, config/*, o cualquier archivo del proyecto."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": (
+                        "read_file — leer un archivo del proyecto | "
+                        "edit_file — buscar y reemplazar texto en un archivo (requiere target y replacement) | "
+                        "append_file — agregar contenido al final de un archivo | "
+                        "create_file — crear o sobrescribir un archivo | "
+                        "list_files — listar archivos de un directorio | "
+                        "list_backups — ver backups disponibles | "
+                        "restore_backup — restaurar un backup anterior"
+                    )
+                },
+                "file": {
+                    "type": "STRING",
+                    "description": "Ruta del archivo relativa al proyecto (ej: 'main.py', 'actions/terminal_agent.py', 'core/prompt.txt')"
+                },
+                "target": {
+                    "type": "STRING",
+                    "description": "Para edit_file: el texto EXACTO a buscar (incluyendo espacios e indentación)"
+                },
+                "replacement": {
+                    "type": "STRING",
+                    "description": "Para edit_file: el texto que reemplazará al target"
+                },
+                "content": {
+                    "type": "STRING",
+                    "description": "Para append_file/create_file: el contenido a escribir"
+                },
+                "directory": {
+                    "type": "STRING",
+                    "description": "Para list_files: directorio a listar (default: raíz del proyecto)"
+                },
+                "backup_name": {
+                    "type": "STRING",
+                    "description": "Para restore_backup: nombre del archivo .bak a restaurar"
+                }
+            },
+            "required": ["action"]
+        }
+    },
 ]
 
 # Cargar herramientas dinámicas creadas por tool_creator
@@ -1925,6 +2004,8 @@ class JarvisLive:
 
     def _apply_config(self, cfg: dict):
         """Called from UI thread when user saves settings. Triggers session reconnect."""
+        global _cached_api_key
+        _cached_api_key = None  # Invalidate cached key so new one is loaded on reconnect
         print("[JARVIS] ⚙️ Config actualizada — reconectando sesión...")
         self.ui.write_log("SYS: Aplicando nueva configuración...")
         if self._reconnect_event and self._loop:
@@ -2003,7 +2084,7 @@ class JarvisLive:
                 )
                 return resp.text.strip()
 
-            result = await loop.run_in_executor(None, _analyze)
+            result = await loop.run_in_executor(_TOOL_EXECUTOR, _analyze)
             self.ui.write_log(f"JARVIS: {result}")
 
             # Feed result back into the realtime session so JARVIS can speak it
@@ -2304,7 +2385,7 @@ class JarvisLive:
 
         try:
             if name == "open_app":
-                r = await loop.run_in_executor(None, lambda: open_app(parameters=args, response=None, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
 
             elif name == "sleep_mode":
@@ -2313,37 +2394,37 @@ class JarvisLive:
                 result = "Entrando en suspensión absoluta. Cortando transmisión a la nube hasta escuchar 'JARVIS'."
 
             elif name == "weather_report":
-                r = await loop.run_in_executor(None, lambda: weather_action(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: weather_action(parameters=args, player=self.ui))
                 result = r or "Weather delivered."
 
             elif name == "browser_control":
-                r = await loop.run_in_executor(None, lambda: browser_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: browser_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "visual_click":
-                r = await loop.run_in_executor(None, lambda: visual_click(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: visual_click(parameters=args, player=self.ui))
                 result = r or "Done."
 
 
 
             elif name == "file_controller":
-                r = await loop.run_in_executor(None, lambda: file_controller(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: file_controller(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "send_message":
-                r = await loop.run_in_executor(None, lambda: send_message(parameters=args, response=None, player=self.ui, session_memory=None))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: send_message(parameters=args, response=None, player=self.ui, session_memory=None))
                 result = r or f"Message sent to {args.get('receiver')}."
 
             elif name == "reminder":
-                r = await loop.run_in_executor(None, lambda: reminder(parameters=args, response=None, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: reminder(parameters=args, response=None, player=self.ui))
                 result = r or "Reminder set."
 
             elif name == "youtube_video":
-                r = await loop.run_in_executor(None, lambda: youtube_video(parameters=args, response=None, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: youtube_video(parameters=args, response=None, player=self.ui))
                 result = r or "Done."
 
             elif name == "screen_process" or name == "screen_vision":
-                r = await loop.run_in_executor(None, lambda: screen_vision(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: screen_vision(parameters=args, player=self.ui))
                 result = r or "No pude analizar la imagen/pantalla."
 
             elif name == "computer_settings":
@@ -2401,19 +2482,19 @@ class JarvisLive:
                             result = "Ventana maximizada."
                         except Exception as e: result = f"Error al maximizar: {e}"
                     else:
-                        r = await loop.run_in_executor(None, lambda: computer_settings(parameters=args, response=None, player=self.ui))
+                        r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: computer_settings(parameters=args, response=None, player=self.ui))
                         result = r or "Done."
 
             elif name == "desktop_control":
-                r = await loop.run_in_executor(None, lambda: desktop_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: desktop_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "code_helper":
-                r = await loop.run_in_executor(None, lambda: code_helper(parameters=args, player=self.ui, speak=self.speak))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: code_helper(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "dev_agent":
-                r = await loop.run_in_executor(None, lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "agent_task":
@@ -2424,7 +2505,7 @@ class JarvisLive:
                 result   = f"Task started (ID: {task_id})."
 
             elif name == "web_search":
-                r = await loop.run_in_executor(None, lambda: web_search_action(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: web_search_action(parameters=args, player=self.ui))
                 result = r or "Done."
             elif name == "file_processor":
                 if not args.get("file_path") and self.ui.current_file:
@@ -2436,123 +2517,123 @@ class JarvisLive:
                 result = r or "Done."
 
             elif name == "computer_control":
-                r = await loop.run_in_executor(None, lambda: computer_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: computer_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "game_updater":
-                r = await loop.run_in_executor(None, lambda: game_updater(parameters=args, player=self.ui, speak=self.speak))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: game_updater(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "flight_finder":
-                r = await loop.run_in_executor(None, lambda: flight_finder(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: flight_finder(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "google_calendar":
-                r = await loop.run_in_executor(None, lambda: google_calendar(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: google_calendar(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "spotify_control":
-                r = await loop.run_in_executor(None, lambda: spotify_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: spotify_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "rgb_control":
-                r = await loop.run_in_executor(None, lambda: rgb_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: rgb_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "scheduler":
-                r = await loop.run_in_executor(None, lambda: scheduler(parameters=args, player=self.ui, speak=self.speak))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: scheduler(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "google_drive":
-                r = await loop.run_in_executor(None, lambda: google_drive(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: google_drive(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "google_maps":
-                r = await loop.run_in_executor(None, lambda: google_maps(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: google_maps(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "gmail_control":
-                r = await loop.run_in_executor(None, lambda: gmail_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: gmail_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "rules_engine":
-                r = await loop.run_in_executor(None, lambda: rules_engine(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: rules_engine(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "user_profile":
-                r = await loop.run_in_executor(None, lambda: user_profile(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: user_profile(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "goals":
-                r = await loop.run_in_executor(None, lambda: goals(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: goals(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "git_control":
-                r = await loop.run_in_executor(None, lambda: git_control(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: git_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "codebase":
-                r = await loop.run_in_executor(None, lambda: codebase(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: codebase(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "knowledge_base":
-                r = await loop.run_in_executor(None, lambda: knowledge_base(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: knowledge_base(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "whatsapp":
-                r = await loop.run_in_executor(None, lambda: whatsapp(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: whatsapp(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "social_media":
-                r = await loop.run_in_executor(None, lambda: social_media(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: social_media(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "windows_settings":
-                r = await loop.run_in_executor(None, lambda: windows_settings(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: windows_settings(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "document_creator":
-                r = await loop.run_in_executor(None, lambda: document_creator(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: document_creator(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "image_generation":
-                r = await loop.run_in_executor(None, lambda: image_generation(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: image_generation(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "smart_home":
-                r = await loop.run_in_executor(None, lambda: smart_home(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: smart_home(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "system_monitor":
-                r = await loop.run_in_executor(None, lambda: system_monitor(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: system_monitor(parameters=args, player=self.ui))
 
             elif name == "tiktok_analyzer":
-                r = await loop.run_in_executor(None, lambda: tiktok_analyzer(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: tiktok_analyzer(parameters=args, player=self.ui))
 
             elif name == "arca_invoice":
-                r = await loop.run_in_executor(None, lambda: arca_invoice(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: arca_invoice(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "accessibility":
-                r = await loop.run_in_executor(None, lambda: accessibility(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: accessibility(parameters=args, player=self.ui))
                 result = r or "Done."
 
 
 
             elif name == "morning_brief":
-                r = await loop.run_in_executor(None, lambda: morning_brief(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: morning_brief(parameters=args, player=self.ui))
                 result = r or "Aquí está tu informe del día."
 
             elif name == "vision_guardian":
-                r = await loop.run_in_executor(None, lambda: vision_guardian(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: vision_guardian(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "screen_reader":
-                r = await loop.run_in_executor(None, lambda: screen_reader(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: screen_reader(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "accessibility_overlay":
-                r = await loop.run_in_executor(None, lambda: accessibility_overlay(parameters=args, player=self.ui))
+                r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: accessibility_overlay(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "openrouter_agent":
@@ -2573,7 +2654,7 @@ class JarvisLive:
             elif name == "terminal_agent":
                 if terminal_agent:
                     self.ui.write_log("⚠️ Ejecutando en Terminal...")
-                    r = await loop.run_in_executor(None, lambda: terminal_agent(parameters=args, player=self.ui))
+                    r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: terminal_agent(parameters=args, player=self.ui))
                     result = r or "Comando ejecutado."
                 else:
                     result = "Módulo terminal_agent no encontrado."
@@ -2581,7 +2662,7 @@ class JarvisLive:
             elif name == "native_ui":
                 if native_ui:
                     self.ui.write_log("💻 UI Nativa en acción...")
-                    r = await loop.run_in_executor(None, lambda: native_ui(parameters=args, player=self.ui))
+                    r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: native_ui(parameters=args, player=self.ui))
                     result = r or "Acción de UI completada."
                 else:
                     result = "Módulo native_ui no encontrado."
@@ -2654,7 +2735,7 @@ class JarvisLive:
                     sig = inspect.signature(func)
                     kwargs = {"parameters": args, "player": self.ui}
                     if "speak" in sig.parameters: kwargs["speak"] = self.speak
-                    r = await loop.run_in_executor(None, lambda: func(**kwargs))
+                    r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: func(**kwargs))
                     result = r or f"Herramienta {name} ejecutada."
                 except Exception as dyn_e:
                     result = f"Unknown tool: {name}. (Dynamic load failed: {dyn_e})"
@@ -2664,11 +2745,9 @@ class JarvisLive:
             traceback.print_exc()
             self.speak_error(name, e)
 
-        # Record action for habit learning
-        try:
-            record_action(name, args)
-        except Exception:
-            pass
+        # Record action for habit learning (fire-and-forget, non-blocking)
+        if record_action:
+            threading.Thread(target=lambda: record_action(name, args), daemon=True).start()
 
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
@@ -2901,7 +2980,7 @@ class JarvisLive:
                     self.session          = session
                     self._loop            = asyncio.get_event_loop()
                     self.audio_in_queue   = asyncio.Queue()
-                    self.out_queue        = asyncio.Queue(maxsize=2)  # mínimo buffer → descarta audio viejo, menor latencia
+                    self.out_queue        = asyncio.Queue(maxsize=5)  # buffer moderado — evita drops durante ráfagas de mic
                     self._turn_done_event = asyncio.Event()
                     self._reconnect_event = asyncio.Event()
 
@@ -2927,7 +3006,7 @@ class JarvisLive:
                         _hour = __import__("datetime").datetime.now().hour
                         if 6 <= _hour < 12 and not already_briefed_today():
                             async def _auto_brief():
-                                await asyncio.sleep(3)  # let session settle
+                                await asyncio.sleep(1)  # let session settle
                                 await self.session.send_client_content(
                                     turns={"parts": [{"text": "[AUTO] Dame el informe matutino del día."}]},
                                     turn_complete=True
