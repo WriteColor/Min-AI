@@ -47,7 +47,7 @@ def main():
     # FASE 1: Verificación de requisitos
     os.system("cls")
     print_banner()
-    print("\033[36m [FASE 1/4] - Verificando requisitos del sistema...\033[0m")
+    print("\033[36m [FASE 1/5] - Verificando requisitos del sistema...\033[0m")
     print()
     
     print(f"[OK] Python detectado: {sys.version.split()[0]}")
@@ -77,7 +77,7 @@ def main():
     # FASE 2: Entorno Virtual
     os.system("cls")
     print_banner()
-    print("\033[36m [FASE 2/4] - Configurando Entorno Virtual (.venv)...\033[0m")
+    print("\033[36m [FASE 2/5] - Configurando Entorno Virtual (.venv)...\033[0m")
     print()
     
     if not os.path.exists(".venv"):
@@ -97,7 +97,7 @@ def main():
     # FASE 3: Instalación de dependencias
     os.system("cls")
     print_banner()
-    print("\033[36m [FASE 3/4] - Instalando dependencias de JARVIS...\033[0m")
+    print("\033[36m [FASE 3/5] - Instalando dependencias de JARVIS...\033[0m")
     print()
     print("Esto puede tomar unos minutos dependiendo de tu conexión a Internet.")
     print("Instalando requerimientos de forma segura...")
@@ -120,10 +120,69 @@ def main():
         
     time.sleep(1)
     
-    # FASE 4: Acceso directo
+    # FASE 4: Configuración inicial
     os.system("cls")
     print_banner()
-    print("\033[36m [FASE 4/4] - Creación de Accesos Directos...\033[0m")
+    print("\033[36m [FASE 4/5] - Configuración Inicial...\033[0m")
+    print()
+    
+    config_dir = os.path.join(".", "config")
+    api_keys_path = os.path.join(config_dir, "api_keys.json")
+    api_keys_template = os.path.join(config_dir, "api_keys.example.json")
+    rules_path = os.path.join(config_dir, "rules.json")
+    
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
+        print("\033[32m[OK] Directorio config/ creado.\033[0m")
+    
+    if not os.path.exists(api_keys_path):
+        if os.path.exists(api_keys_template):
+            shutil.copy2(api_keys_template, api_keys_path)
+            print("\033[32m[OK] Archivo api_keys.json creado desde plantilla.\033[0m")
+            print("\033[33m[INFO] Al iniciar JARVIS se te pedirán tus API Keys de Gemini y OpenRouter.\033[0m")
+        else:
+            # Crear un archivo mínimo con campos vacíos
+            import json
+            default_config = {
+                "gemini_api_key": "",
+                "os_system": "windows",
+                "camera_index": 0,
+                "mic_device": 0,
+                "spk_device": 0,
+                "chrome_google_profile": "Default",
+                "chrome_exe_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                "timezone": "America/Bogota",
+                "language": "es-ES",
+                "thinking_sound": True,
+                "jarvis_voice": "Charon",
+                "spotify_client_id": "",
+                "spotify_client_secret": "",
+                "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
+                "tmdb_api_key": "",
+                "openrouter_api_key": "",
+                "jarvis_theme": "gold"
+            }
+            with open(api_keys_path, "w", encoding="utf-8") as f:
+                json.dump(default_config, f, indent=4)
+            print("\033[32m[OK] Archivo api_keys.json creado con valores por defecto.\033[0m")
+            print("\033[33m[INFO] Al iniciar JARVIS se te pedirán tus API Keys de Gemini y OpenRouter.\033[0m")
+    else:
+        print("\033[32m[OK] Archivo api_keys.json existente detectado.\033[0m")
+    
+    if not os.path.exists(rules_path):
+        import json
+        with open(rules_path, "w", encoding="utf-8") as f:
+            json.dump({"rules": []}, f, indent=4)
+        print("\033[32m[OK] Archivo rules.json creado.\033[0m")
+    else:
+        print("\033[32m[OK] Archivo rules.json existente detectado.\033[0m")
+    
+    time.sleep(1)
+    
+    # FASE 5: Acceso directo
+    os.system("cls")
+    print_banner()
+    print("\033[36m [FASE 5/5] - Creación de Accesos Directos...\033[0m")
     print()
     print("Creando acceso directo en tu Escritorio para un inicio rápido...")
     print()
