@@ -3117,8 +3117,7 @@ def main():
                         label.hide()
 
             # 2. Add keyboard shortcut & Global Hotkey (INS / Insert key) to wake up JARVIS
-            from PyQt6.QtGui import QKeySequence
-            from PyQt6.QShortcut import QShortcut
+            from PyQt6.QtGui import QKeySequence, QShortcut
             from PyQt6.QtCore import Qt, QTimer
 
             def on_shortcut_triggered():
