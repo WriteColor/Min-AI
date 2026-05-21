@@ -1,0 +1,39 @@
+{
+  "identity": {
+    "name": {
+      "value": "Tupac",
+      "updated": "2026-05-21"
+    },
+    "honorific": {
+      "value": "Señor",
+      "updated": "2026-05-17"
+    },
+    "name_spelling": {
+      "value": "Túpac (with accent on U)",
+      "updated": "2026-05-17"
+    },
+    "city": {
+      "value": "Lima, Peru",
+      "updated": "2026-05-17"
+    },
+    "mood": {
+      "value": "festive",
+      "updated": "2026-05-17"
+    }
+  },
+  "preferences": {
+    "address_form": {
+      "value": "Señor",
+      "updated": "2026-05-17"
+    }
+  },
+  "projects": {
+    "code_project_status": {
+      "value": "User is modifying a large (2000+ lines) demo code project because the premium version cannot be cracked. Added functions and changed aspects.",
+      "updated": "2026-05-17"
+    }
+  },
+  "relationships": {},
+  "wishes": {},
+  "notes": {}
+}
