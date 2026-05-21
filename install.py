@@ -192,18 +192,33 @@ def main():
         icon_path = os.path.join(current_dir, "assets", "jarvis_icono.ico")
         target_vbs = os.path.join(current_dir, "Iniciar JARVIS Beta.vbs")
         
-        # Usar PowerShell de forma nativa desde Python sin lidiar con escapes de comillas
+        # Crear acceso directo con PowerShell
         ps_cmd = (
             f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut(([System.Environment]::GetFolderPath('Desktop')+'\\JARVIS AI.lnk'));"
             f"$s.TargetPath='{target_vbs}';"
             f"$s.WorkingDirectory='{current_dir}';"
             f"$s.IconLocation='{icon_path}';"
-            f"$s.Description='Lanzador de JARVIS AI';"
+            f"$s.Description='Lanzador de JARVIS AI (Admin)';"
             f"$s.Save()"
         )
         
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=True)
-        print("\033[32m[OK] Acceso directo 'JARVIS AI' creado en el Escritorio.\033[0m")
+        
+        # Marcar el .lnk como "Ejecutar como Administrador"
+        # El flag está en el byte 21 del archivo .lnk (bit 0x20)
+        try:
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+            lnk_path = os.path.join(desktop, "JARVIS AI.lnk")
+            if os.path.exists(lnk_path):
+                with open(lnk_path, "rb") as f:
+                    data = bytearray(f.read())
+                data[21] = data[21] | 0x20  # Set RunAsAdmin flag
+                with open(lnk_path, "wb") as f:
+                    f.write(data)
+        except Exception:
+            pass  # El VBS ya tiene auto-elevación, esto es redundante
+        
+        print("\033[32m[OK] Acceso directo 'JARVIS AI' creado en el Escritorio (con permisos de Admin).\033[0m")
     except Exception as e:
         print(f"\033[33m[ADVERTENCIA] No se pudo crear el acceso directo de forma automática: {e}\033[0m")
         
