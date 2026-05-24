@@ -8,7 +8,6 @@ venv.bak/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
 *$py.class
 # Config and Sensitive Files
 config/api_keys.json
@@ -27,7 +26,3 @@ patch_main.py
 .idea/
 .DS_Store
 Thumbs.db
-
-# Excepciones: archivos compilados necesarios para que funcione el programa
-!ui_compiled.pyc
-!file_events.pyc
