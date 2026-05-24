@@ -81,13 +81,13 @@ class CustomParticleOrb(QWidget):
         try:
             from PyQt6.QtWebEngineCore import QWebEngineSettings
             settings = self.web_view.settings()
-            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, False)  # Canvas is 2D, WebGL is unused
+            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)   # Enabled for high-performance fluid rendering
             settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)  # Disable Flash/PDF plugins
             settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)  # No local storage needed
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, False)
-            print("[JARVIS] QWebEngineView memory optimizations successfully applied.")
+            print("[JARVIS] QWebEngineView optimized settings successfully applied.")
         except Exception as e:
-            print(f"[JARVIS] Failed to apply WebEngine memory optimizations: {e}")
+            print(f"[JARVIS] Failed to apply WebEngine optimizations: {e}")
         
         # Setup QWebChannel
         self.channel = QWebChannel()

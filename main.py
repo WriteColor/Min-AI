@@ -31,23 +31,18 @@ if _gpu_enabled:
     os.environ["QSG_INFO"] = "1"
     print("[JARVIS] GPU Acceleration is ENABLED. Offloading RAM rendering workload to GPU.")
 else:
-    # Aggressive Low RAM / CPU-only fallback Mode (disables GPU rendering & WebGL to save up to 200MB+ VRAM/RAM)
+    # Balanced low-RAM mode: Keep GPU hardware compositing enabled so glowing CSS effects and drop-shadows are rendered beautifully, but limit renderer processes and JS space size.
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
         "--enable-low-end-device-mode "
         "--renderer-process-limit=1 "
-        "--js-flags=--max-old-space-size=32 "
+        "--js-flags=--max-old-space-size=64 "
         "--disable-gpu-shader-disk-cache "
         "--disable-dev-shm-usage "
-        "--disable-gpu "
-        "--disable-gpu-compositing "
-        "--disable-webgl "
-        "--disable-speech-api "
-        "--disable-background-networking "
         "--disable-extensions "
         "--disable-sync "
         "--mute-audio"
     )
-    print("[JARVIS] GPU Acceleration is DISABLED. Using Aggressive Low RAM CPU mode (WebGL & GPU processes disabled).")
+    print("[JARVIS] Using Balanced Low RAM GPU-Composited mode for beautiful fluid rendering.")
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor

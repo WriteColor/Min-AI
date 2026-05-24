@@ -8,7 +8,7 @@
   "frequent_actions": {
     "morning_brief": 7,
     "screen_vision": 31,
-    "windows_settings": 44,
+    "windows_settings": 45,
     "browser_control": 22,
     "whatsapp": 16,
     "document_creator": 19,
@@ -245,9 +245,12 @@
       "web_search": 1,
       "system_monitor": 1,
       "sleep_mode": 1
+    },
+    "sunday_01h": {
+      "windows_settings": 1
     }
   },
   "notes": [],
   "created": "2026-05-17T15:17:31.932824",
-  "last_updated": "2026-05-23T23:23:17.426824"
+  "last_updated": "2026-05-24T01:06:24.668619"
 }

@@ -83,7 +83,7 @@
             height: 100%;
             z-index: 10;
             cursor: pointer;
-            filter: drop-shadow(0 0 25px var(--primary-glow));
+            filter: drop-shadow(0 0 35px var(--primary-glow));
             transition: transform 0.1s ease-out;
         }
 
@@ -92,10 +92,10 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 70%;
-            height: 70%;
+            width: 75%;
+            height: 75%;
             transform: translate(-50%, -50%);
-            background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, transparent 70%);
             border-radius: 50%;
             pointer-events: none;
             mix-blend-mode: screen;
@@ -513,7 +513,7 @@
             // Draw beautiful central glowing arc-reactor core inside the canvas
             if (currentState !== "MUTED") {
                 const glowGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, currentRadius * 0.95);
-                const centralGlowOpacity = 0.12 + (currentState === "SPEAKING" ? currentVolume * 0.25 : 0.02);
+                const centralGlowOpacity = 0.25 + (currentState === "SPEAKING" ? currentVolume * 0.35 : 0.06);
                 glowGrad.addColorStop(0, hexToRgba(themeColors.PRI, centralGlowOpacity));
                 glowGrad.addColorStop(1, 'transparent');
                 ctx.fillStyle = glowGrad;
@@ -670,7 +670,7 @@
                 
                 if (halo) {
                     halo.style.transform = `translate(-50%, -50%)`;
-                    halo.style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.1)} 0%, transparent 70%)`;
+                    halo.style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.2)} 0%, transparent 70%)`;
                 }
             }
         };
@@ -697,7 +697,7 @@
             document.documentElement.style.setProperty('--capsule-bg', capsuleBg);
 
             // Apply theme changes to widgets
-            document.getElementById('ambient-halo').style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.1)} 0%, transparent 70%)`;
+            document.getElementById('ambient-halo').style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.2)} 0%, transparent 70%)`;
             document.getElementById('synaptic-stats').style.color = themeColors.PRI;
             
             // Capsule borders and labels
