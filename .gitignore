@@ -27,3 +27,7 @@ patch_main.py
 .idea/
 .DS_Store
 Thumbs.db
+
+# Excepciones: archivos compilados necesarios para que funcione el programa
+!ui_compiled.pyc
+!file_events.pyc
