@@ -6,6 +6,12 @@ import re
 import threading
 import json
 import sys
+try:
+    import pygetwindow as gw
+except ImportError:
+    gw = None
+from PyQt6.QtCore import QMetaObject, Qt
+
 import traceback
 from pathlib import Path
 
@@ -274,13 +280,13 @@ try:
 except ImportError:
     native_ui = None
 try:
-    from actions.accessibility          import accessibility
+    from actions.accessibility          import accessibility, eye_tracking, micro_movement, task_simplify, routine_gamify
 except ImportError:
     accessibility = None
-try:
-    from actions.screen_vision          import screen_vision
-except ImportError:
-    screen_vision = None
+    eye_tracking = None
+    micro_movement = None
+    task_simplify = None
+    routine_gamify = None
 try:
     from actions.screen_reader          import screen_reader
 except ImportError:
@@ -1949,7 +1955,6 @@ TOOL_DECLARATIONS = [
 try:
     _custom_tools_path = BASE_DIR / "actions" / "custom_tools.json"
     if _custom_tools_path.exists():
-        import json
         _custom_tools = json.loads(_custom_tools_path.read_text(encoding="utf-8"))
         if isinstance(_custom_tools, list):
             for _t in _custom_tools:
@@ -1967,7 +1972,6 @@ class JarvisLive:
         self.vosk_recognizer = None
         try:
             import vosk
-            import os
             if os.path.exists("config/vosk_model"):
                 model = vosk.Model("config/vosk_model")
                 self.vosk_recognizer = vosk.KaldiRecognizer(model, 16000)
@@ -2111,28 +2115,36 @@ class JarvisLive:
         # ── Accessibility quick triggers ──────────────────────────────────────
         if any(p in text_lower for p in ["activar seguimiento ocular", "iniciar eye tracking",
                                           "activar control ocular", "encender seguimiento de ojos"]):
-            from actions.accessibility import eye_tracking
-            result = eye_tracking({"action": "start"})
+            if eye_tracking:
+                result = eye_tracking({"action": "start"})
+            else:
+                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
             self.ui.write_log("⚡ " + result)
             return True
 
         if any(p in text_lower for p in ["detener seguimiento ocular", "apagar eye tracking",
                                           "desactivar control ocular"]):
-            from actions.accessibility import eye_tracking
-            result = eye_tracking({"action": "stop"})
+            if eye_tracking:
+                result = eye_tracking({"action": "stop"})
+            else:
+                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
             self.ui.write_log("⚡ " + result)
             return True
 
         if any(p in text_lower for p in ["activar detector de movimientos", "iniciar movimiento",
                                           "activar micromovimientos", "encender control por cabeza"]):
-            from actions.accessibility import micro_movement
-            result = micro_movement({"action": "start"})
+            if micro_movement:
+                result = micro_movement({"action": "start"})
+            else:
+                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
             self.ui.write_log("⚡ " + result)
             return True
 
         if any(p in text_lower for p in ["detener detector de movimientos", "apagar micromovimientos"]):
-            from actions.accessibility import micro_movement
-            result = micro_movement({"action": "stop"})
+            if micro_movement:
+                result = micro_movement({"action": "stop"})
+            else:
+                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
             self.ui.write_log("⚡ " + result)
             return True
 
@@ -2141,8 +2153,10 @@ class JarvisLive:
                 if phrase in text_lower:
                     task_text = user_text[len(phrase):].strip()
                     if task_text:
-                        from actions.accessibility import task_simplify
-                        result = task_simplify(task_text)
+                        if task_simplify:
+                            result = task_simplify(task_text)
+                        else:
+                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
                         self.ui.write_log("⚡ [Simplificado]\n" + result[:300])
                         return True
 
@@ -2151,8 +2165,10 @@ class JarvisLive:
                 if phrase in text_lower:
                     routine_name = user_text[len(phrase):].strip()
                     if routine_name:
-                        from actions.accessibility import routine_gamify
-                        result = routine_gamify({"action": "add", "name": routine_name})
+                        if routine_gamify:
+                            result = routine_gamify({"action": "add", "name": routine_name})
+                        else:
+                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
                         self.ui.write_log("⚡ " + result)
                         return True
 
@@ -2161,14 +2177,18 @@ class JarvisLive:
                 if phrase in text_lower:
                     routine_name = user_text[len(phrase):].strip()
                     if routine_name:
-                        from actions.accessibility import routine_gamify
-                        result = routine_gamify({"action": "complete", "name": routine_name})
+                        if routine_gamify:
+                            result = routine_gamify({"action": "complete", "name": routine_name})
+                        else:
+                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
                         self.ui.write_log("⚡ " + result)
                         return True
 
         if "mis rutinas" in text_lower or "ver rutinas" in text_lower or "listar rutinas" in text_lower:
-            from actions.accessibility import routine_gamify
-            result = routine_gamify({"action": "list"})
+            if routine_gamify:
+                result = routine_gamify({"action": "list"})
+            else:
+                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
             self.ui.write_log("⚡ [Rutinas]\n" + result)
             return True
 
@@ -2391,6 +2411,7 @@ class JarvisLive:
             elif name == "sleep_mode":
                 self.is_sleeping = True
                 self.ui.write_log("SYS: 💤 Entrando en suspensión local.")
+                self.ui.set_state("MUTED")
                 result = "Entrando en suspensión absoluta. Cortando transmisión a la nube hasta escuchar 'JARVIS'."
 
             elif name == "weather_report":
@@ -2468,19 +2489,25 @@ class JarvisLive:
                         result = f"Error en control de volumen: {ve}"
                 else:
                     if action in ["window_minimize", "minimize"]:
-                        try:
-                            import pygetwindow as gw
-                            window = gw.getActiveWindow()
-                            if window: window.minimize()
-                            result = "Ventana minimizada."
-                        except Exception as e: result = f"Error al minimizar: {e}"
+                        if gw:
+                            try:
+                                window = gw.getActiveWindow()
+                                if window: window.minimize()
+                                result = "Ventana minimizada."
+                            except Exception as e:
+                                result = f"Error al minimizar: {e}"
+                        else:
+                            result = "Librería pygetwindow no disponible."
                     elif action in ["window_maximize", "maximize"]:
-                        try:
-                            import pygetwindow as gw
-                            window = gw.getActiveWindow()
-                            if window: window.maximize()
-                            result = "Ventana maximizada."
-                        except Exception as e: result = f"Error al maximizar: {e}"
+                        if gw:
+                            try:
+                                window = gw.getActiveWindow()
+                                if window: window.maximize()
+                                result = "Ventana maximizada."
+                            except Exception as e:
+                                result = f"Error al maximizar: {e}"
+                        else:
+                            result = "Librería pygetwindow no disponible."
                     else:
                         r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: computer_settings(parameters=args, response=None, player=self.ui))
                         result = r or "Done."
@@ -2673,7 +2700,6 @@ class JarvisLive:
                 if action_ui == "minimize":
                     try:
                         if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showMinimized"):
-                            from PyQt6.QtCore import QMetaObject, Qt
                             QMetaObject.invokeMethod(self.ui._win, "showMinimized", Qt.ConnectionType.QueuedConnection)
                         elif hasattr(self.ui, "root") and hasattr(self.ui.root, "iconify"):
                             self.ui.root.after(0, self.ui.root.iconify)
@@ -2683,7 +2709,6 @@ class JarvisLive:
                 elif action_ui == "restore":
                     try:
                         if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                            from PyQt6.QtCore import QMetaObject, Qt
                             QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
                             QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
                         elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
@@ -2703,7 +2728,6 @@ class JarvisLive:
                         if action_ui == "show":
                             try:
                                 if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                                    from PyQt6.QtCore import QMetaObject, Qt
                                     QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
                                     QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
                                 elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
@@ -2770,13 +2794,13 @@ class JarvisLive:
         def callback(indata, frames, time_info, status):
             if getattr(self, "is_sleeping", False):
                 if getattr(self, "vosk_recognizer", None):
-                    import json
                     audio_data = indata.tobytes()
                     if self.vosk_recognizer.AcceptWaveform(audio_data):
                         res = json.loads(self.vosk_recognizer.Result())
                         text = res.get("text", "")
                         if "jarvis" in text.lower():
                             self.is_sleeping = False
+                            self.ui.set_state("LISTENING")
                             self.ui.write_log("SYS: 🟢 ¡Despierto!")
                             try:
                                 import winsound

@@ -31,3 +31,5 @@ gtts
 edge-tts
 cryptography
 eventlet
+vosk
+qtawesome
