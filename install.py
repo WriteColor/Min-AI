@@ -160,7 +160,8 @@ def main():
                 "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
                 "tmdb_api_key": "",
                 "openrouter_api_key": "",
-                "jarvis_theme": "gold"
+                "jarvis_theme": "gold",
+                "gpu_acceleration": False
             }
             with open(api_keys_path, "w", encoding="utf-8") as f:
                 json.dump(default_config, f, indent=4)

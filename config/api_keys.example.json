@@ -15,5 +15,6 @@
     "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
     "tmdb_api_key": "",
     "openrouter_api_key": "",
-    "jarvis_theme": "gold"
+    "jarvis_theme": "gold",
+    "gpu_acceleration": false
 }

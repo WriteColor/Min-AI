@@ -1,5 +1,45 @@
 import os
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--enable-low-end-device-mode --renderer-process-limit=1 --js-flags=--max-old-space-size=64 --disable-gpu-shader-disk-cache --disable-dev-shm-usage"
+import json
+import sys
+from pathlib import Path
+
+# Load config early to determine GPU acceleration settings
+_gpu_enabled = False
+try:
+    if getattr(sys, "frozen", False):
+        _base_dir = Path(sys.executable).parent
+    else:
+        _base_dir = Path(__file__).resolve().parent
+    _cfg_path = _base_dir / "config" / "api_keys.json"
+    if _cfg_path.exists():
+        _cfg = json.loads(_cfg_path.read_text(encoding="utf-8"))
+        _gpu_enabled = _cfg.get("gpu_acceleration", False)
+except Exception:
+    pass
+
+if _gpu_enabled:
+    # GPU / High Performance Mode: sustain rendering workload on GPU VRAM, maximize space size
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--ignore-gpu-blocklist "
+        "--enable-gpu-rasterization "
+        "--enable-zero-copy "
+        "--num-raster-threads=4 "
+        "--js-flags=--max-old-space-size=1024"
+    )
+    # Enable hardware acceleration backends for Qt
+    os.environ["QSG_RHI_BACKEND"] = "d3d11" # Force Direct3D 11 for hardware rendering on Windows
+    os.environ["QSG_INFO"] = "1"
+    print("[JARVIS] GPU Acceleration is ENABLED. Offloading RAM rendering workload to GPU.")
+else:
+    # Low RAM / CPU-only fallback Mode
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--enable-low-end-device-mode "
+        "--renderer-process-limit=1 "
+        "--js-flags=--max-old-space-size=64 "
+        "--disable-gpu-shader-disk-cache "
+        "--disable-dev-shm-usage"
+    )
+    print("[JARVIS] GPU Acceleration is DISABLED. Using Low RAM CPU mode.")
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -80,22 +120,56 @@ def _patch_settings_ui():
             scroll = original_build(self)
             try:
                 form = scroll.widget().layout()
+                
+                # 1. OpenRouter API
                 self._or_key_input = self._s_line(self._cfg.get("openrouter_api_key", ""), "sk-or-...", password=True)
                 form.addWidget(self._s_section("OPENROUTER API"))
                 form.addLayout(self._s_field("API Key", self._or_key_input))
+                
+                # 2. GPU Hardware Acceleration
+                from PyQt6.QtWidgets import QCheckBox
+                self._gpu_checkbox = QCheckBox()
+                self._gpu_checkbox.setChecked(self._cfg.get("gpu_acceleration", False))
+                self._gpu_checkbox.setStyleSheet("""
+                    QCheckBox {
+                        color: #f59e0b;
+                        font-weight: bold;
+                        spacing: 8px;
+                        background: transparent;
+                    }
+                    QCheckBox::indicator {
+                        width: 18px;
+                        height: 18px;
+                        border: 1.5px solid rgba(245, 158, 11, 0.5);
+                        border-radius: 4px;
+                        background: rgba(35, 28, 10, 0.65);
+                    }
+                    QCheckBox::indicator:checked {
+                        background-color: #f59e0b;
+                        border-color: #f59e0b;
+                    }
+                    QCheckBox::indicator:hover {
+                        border-color: #f59e0b;
+                    }
+                """)
+                form.addWidget(self._s_section("RENDIMIENTO Y GPU"))
+                form.addLayout(self._s_field("Aceleración por GPU (Consumo en Video)", self._gpu_checkbox))
+                
             except Exception as e:
-                print(f"[PATCH] Error agregando OpenRouter UI: {e}")
+                print(f"[PATCH] Error agregando OpenRouter/GPU UI: {e}")
             return scroll
         
         original_save = ui.DeviceSettingsDialog._save
         def patched_save(self):
             if hasattr(self, '_or_key_input'):
                 self._cfg["openrouter_api_key"] = self._or_key_input.text().strip()
+            if hasattr(self, '_gpu_checkbox'):
+                self._cfg["gpu_acceleration"] = self._gpu_checkbox.isChecked()
             original_save(self)
             
         ui.DeviceSettingsDialog._build_page_general = patched_build
         ui.DeviceSettingsDialog._save = patched_save
-        print("[PATCH] OpenRouter UI injectado con éxito.")
+        print("[PATCH] OpenRouter & GPU UI inyectados con éxito.")
     except Exception as e:
         print(f"[PATCH] Falla general en patch: {e}")
 
