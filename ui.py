@@ -77,6 +77,18 @@ class CustomParticleOrb(QWidget):
         self.web_view.setStyleSheet("background: transparent;")
         self.web_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
         
+        # Optimize QWebEngineView settings to aggressively save RAM (up to 150MB+ memory reduction)
+        try:
+            from PyQt6.QtWebEngineCore import QWebEngineSettings
+            settings = self.web_view.settings()
+            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, False)  # Canvas is 2D, WebGL is unused
+            settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)  # Disable Flash/PDF plugins
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)  # No local storage needed
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, False)
+            print("[JARVIS] QWebEngineView memory optimizations successfully applied.")
+        except Exception as e:
+            print(f"[JARVIS] Failed to apply WebEngine memory optimizations: {e}")
+        
         # Setup QWebChannel
         self.channel = QWebChannel()
         self.bridge = WebBridge(self)

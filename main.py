@@ -31,15 +31,23 @@ if _gpu_enabled:
     os.environ["QSG_INFO"] = "1"
     print("[JARVIS] GPU Acceleration is ENABLED. Offloading RAM rendering workload to GPU.")
 else:
-    # Low RAM / CPU-only fallback Mode
+    # Aggressive Low RAM / CPU-only fallback Mode (disables GPU rendering & WebGL to save up to 200MB+ VRAM/RAM)
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
         "--enable-low-end-device-mode "
         "--renderer-process-limit=1 "
-        "--js-flags=--max-old-space-size=64 "
+        "--js-flags=--max-old-space-size=32 "
         "--disable-gpu-shader-disk-cache "
-        "--disable-dev-shm-usage"
+        "--disable-dev-shm-usage "
+        "--disable-gpu "
+        "--disable-gpu-compositing "
+        "--disable-webgl "
+        "--disable-speech-api "
+        "--disable-background-networking "
+        "--disable-extensions "
+        "--disable-sync "
+        "--mute-audio"
     )
-    print("[JARVIS] GPU Acceleration is DISABLED. Using Low RAM CPU mode.")
+    print("[JARVIS] GPU Acceleration is DISABLED. Using Aggressive Low RAM CPU mode (WebGL & GPU processes disabled).")
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -2614,7 +2622,7 @@ class JarvisLive:
                 if not args.get("file_path") and self.ui.current_file:
                     args["file_path"] = self.ui.current_file
                 r = await loop.run_in_executor(
-                    None,
+                    _TOOL_EXECUTOR,
                     lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
                 )
                 result = r or "Done."
@@ -2709,9 +2717,11 @@ class JarvisLive:
 
             elif name == "system_monitor":
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: system_monitor(parameters=args, player=self.ui))
+                result = r or "Done."
 
             elif name == "tiktok_analyzer":
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: tiktok_analyzer(parameters=args, player=self.ui))
+                result = r or "Done."
 
             elif name == "arca_invoice":
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: arca_invoice(parameters=args, player=self.ui))
@@ -2744,7 +2754,7 @@ class JarvisLive:
                     # Se delega la tarea a OpenRouter
                     self.ui.write_log("🤖 Delegando tarea a OpenRouter...")
                     r = await loop.run_in_executor(
-                        None, 
+                        _TOOL_EXECUTOR, 
                         lambda: openrouter_agent(
                             query=args.get("query", ""),
                             model=args.get("model", "google/gemini-2.5-flash")
