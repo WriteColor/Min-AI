@@ -1,7 +1,9 @@
+import os
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--enable-low-end-device-mode --renderer-process-limit=1 --js-flags=--max-old-space-size=64 --disable-gpu-shader-disk-cache --disable-dev-shm-usage"
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from beta_config import is_pro_tool, check_daily_limit, increment_calls, pro_tool_message, daily_limit_message
-import os
 import re
 import threading
 import json
