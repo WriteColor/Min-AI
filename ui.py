@@ -610,7 +610,7 @@ class DeviceSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("JARVIS Settings Configuration Control")
-        self.resize(550, 480)
+        self.resize(550, 740)
         self.update_style()
         
         layout = QVBoxLayout(self)
@@ -660,6 +660,36 @@ class DeviceSettingsDialog(QDialog):
         
         self.chk_gpu = QCheckBox("Enable GPU Rendering Acceleration")
         layout.addWidget(self.chk_gpu)
+        
+        # Spotify Developer Integration Section
+        layout.addWidget(QLabel("<h3>Spotify Developer Integration</h3>"))
+        
+        self.spotify_id_lbl = QLabel("Spotify Client ID:")
+        layout.addWidget(self.spotify_id_lbl)
+        self.inp_spotify_id = QLineEdit()
+        layout.addWidget(self.inp_spotify_id)
+        
+        self.spotify_secret_lbl = QLabel("Spotify Client Secret:")
+        layout.addWidget(self.spotify_secret_lbl)
+        self.inp_spotify_secret = QLineEdit()
+        self.inp_spotify_secret.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.inp_spotify_secret)
+        
+        self.spotify_uri_lbl = QLabel("Spotify Redirect URI:")
+        layout.addWidget(self.spotify_uri_lbl)
+        self.inp_spotify_uri = QLineEdit()
+        self.inp_spotify_uri.setText("http://127.0.0.1:8888/callback")
+        layout.addWidget(self.inp_spotify_uri)
+        
+        spotify_auth_layout = QHBoxLayout()
+        self.btn_spotify_login = QPushButton("Conectar con Spotify")
+        self.lbl_spotify_status = QLabel("Consultando estado...")
+        self.lbl_spotify_status.setStyleSheet("color: #a3a3a3; font-style: italic;")
+        spotify_auth_layout.addWidget(self.btn_spotify_login)
+        spotify_auth_layout.addWidget(self.lbl_spotify_status)
+        layout.addLayout(spotify_auth_layout)
+        
+        self.btn_spotify_login.clicked.connect(self.connect_spotify)
         
         btn_layout = QHBoxLayout()
         self.btn_save = QPushButton("Save Configurations")
@@ -714,6 +744,14 @@ class DeviceSettingsDialog(QDialog):
             idx = self.cmb_speaker.findData(spk)
             if idx >= 0: self.cmb_speaker.setCurrentIndex(idx)
             
+            # Load Spotify configs
+            self.inp_spotify_id.setText(cfg.get("spotify_client_id", ""))
+            self.inp_spotify_secret.setText(cfg.get("spotify_client_secret", ""))
+            self.inp_spotify_uri.setText(cfg.get("spotify_redirect_uri", "http://127.0.0.1:8888/callback"))
+            
+            # Check Spotify Auth status
+            self.lbl_spotify_status.setText(self.check_spotify_auth_status())
+            
         except Exception:
             pass
             
@@ -729,7 +767,10 @@ class DeviceSettingsDialog(QDialog):
                 "jarvis_theme": theme_val,
                 "gpu_acceleration": self.chk_gpu.isChecked(),
                 "mic_device": self.cmb_mic.currentData(),
-                "speaker_device": self.cmb_speaker.currentData()
+                "speaker_device": self.cmb_speaker.currentData(),
+                "spotify_client_id": self.inp_spotify_id.text().strip(),
+                "spotify_client_secret": self.inp_spotify_secret.text().strip(),
+                "spotify_redirect_uri": self.inp_spotify_uri.text().strip()
             }
             save_api_keys(cfg)
             
@@ -743,6 +784,89 @@ class DeviceSettingsDialog(QDialog):
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
+
+    def check_spotify_auth_status(self):
+        try:
+            client_id = self.inp_spotify_id.text().strip()
+            client_secret = self.inp_spotify_secret.text().strip()
+            redirect_uri = self.inp_spotify_uri.text().strip()
+            
+            if not client_id or not client_secret:
+                return "Falta configurar credenciales"
+                
+            import spotipy
+            from spotipy.oauth2 import SpotifyOAuth
+            sp_oauth = SpotifyOAuth(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                open_browser=False
+            )
+            token = sp_oauth.get_cached_token()
+            if token:
+                return "✅ Conectado"
+            else:
+                return "⚠️ Desconectado"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def connect_spotify(self):
+        client_id = self.inp_spotify_id.text().strip()
+        client_secret = self.inp_spotify_secret.text().strip()
+        redirect_uri = self.inp_spotify_uri.text().strip()
+        
+        if not client_id or not client_secret:
+            QMessageBox.warning(self, "Spotify API", "Por favor, ingresa el Client ID y el Client Secret primero.")
+            return
+            
+        # Temporarily save these settings so that the background OAuth flow can read them
+        try:
+            from memory.config_manager import load_api_keys, save_api_keys
+            cfg = load_api_keys()
+            cfg["spotify_client_id"] = client_id
+            cfg["spotify_client_secret"] = client_secret
+            cfg["spotify_redirect_uri"] = redirect_uri
+            save_api_keys(cfg)
+        except Exception:
+            pass
+            
+        self.lbl_spotify_status.setText("⏳ Abriendo navegador...")
+        self.btn_spotify_login.setEnabled(False)
+        
+        import threading
+        def auth_worker():
+            try:
+                import spotipy
+                from spotipy.oauth2 import SpotifyOAuth
+                
+                sp_oauth = SpotifyOAuth(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    redirect_uri=redirect_uri,
+                    scope="user-modify-playback-state user-read-playback-state user-read-currently-playing",
+                    open_browser=True
+                )
+                
+                # Triggers browser and starts spotipy's built-in local redirect listener
+                token_info = sp_oauth.get_access_token(as_dict=False)
+                if token_info:
+                    QTimer.singleShot(0, self.spotify_auth_success)
+                else:
+                    QTimer.singleShot(0, lambda: self.spotify_auth_failed("No se obtuvo token."))
+            except Exception as e:
+                QTimer.singleShot(0, lambda: self.spotify_auth_failed(str(e)))
+                
+        threading.Thread(target=auth_worker, daemon=True).start()
+
+    def spotify_auth_success(self):
+        self.btn_spotify_login.setEnabled(True)
+        self.lbl_spotify_status.setText("✅ Conectado")
+        QMessageBox.information(self, "Spotify API", "¡Autenticación con Spotify exitosa, sir!")
+
+    def spotify_auth_failed(self, error):
+        self.btn_spotify_login.setEnabled(True)
+        self.lbl_spotify_status.setText("❌ Error")
+        QMessageBox.critical(self, "Spotify API Error", f"Fallo al conectar: {error}")
 
     def update_style(self):
         self.setStyleSheet(f"""
