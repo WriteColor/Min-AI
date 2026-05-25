@@ -1,44 +1,95 @@
+"""ui.py — 100% Custom Gold-Themed Dynamic Bento PyQt6 User Interface for JARVIS.
+
+Fully optimized HUD layouts:
+- Background WebGL reactive Particle Orb covering the screen.
+- Floating transparent digital clock at the top-right corner.
+- Organized Bento grid dashboard aligned perfectly at the bottom half.
+- Centered speech captions at the bottom.
+"""
+from __future__ import annotations
 import sys
 import os
 import json
+import psutil
 from pathlib import Path
-from datetime import timezone, timedelta
+from datetime import datetime, timezone, timedelta
 
-# Professional icon library for PyQt6
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QGridLayout, QLabel, QPushButton, QLineEdit, QTextEdit, 
+    QListWidget, QListWidgetItem, QProgressBar, QDialog, QMessageBox,
+    QComboBox, QCheckBox, QGraphicsDropShadowEffect
+)
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal, pyqtSlot, QObject, QTimer, QSize
+from PyQt6.QtGui import QFont, QColor, QIcon, QMouseEvent
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebChannel import QWebChannel
+
 try:
     import qtawesome as qta
     HAS_QTA = True
 except ImportError:
     HAS_QTA = False
 
-# Import everything from the compiled module
-import ui_compiled
-from ui_compiled import *
-
-# 1. Adapt Timezone to Peru (UTC-5)
+# Active Timezone Peru (UTC-5)
 _BA_TZ = timezone(timedelta(hours=-5))
-ui_compiled._BA_TZ = _BA_TZ
 
-# Active windows tracking for theme synchronization
-_active_windows = []
+# Themes Configuration
+THEMES = {
+    "cyan": {
+        "PRI": "#00d4ff", "PRI_DIM": "#005f77", "BG": "#050c14", 
+        "PANEL": "rgba(10, 22, 32, 0.7)", "BORDER": "rgba(0, 212, 255, 0.45)", "TEXT": "#7aeeff"
+    },
+    "green": {
+        "PRI": "#00ff88", "PRI_DIM": "#006633", "BG": "#040e08", 
+        "PANEL": "rgba(8, 26, 16, 0.7)", "BORDER": "rgba(0, 255, 136, 0.45)", "TEXT": "#7affcc"
+    },
+    "red": {
+        "PRI": "#ff3b30", "PRI_DIM": "#7a1a15", "BG": "#0e0404", 
+        "PANEL": "rgba(26, 8, 8, 0.7)", "BORDER": "rgba(255, 59, 48, 0.45)", "TEXT": "#ffaaaa"
+    },
+    "purple": {
+        "PRI": "#a855f7", "PRI_DIM": "#5b21b6", "BG": "#07030f", 
+        "PANEL": "rgba(15, 6, 24, 0.7)", "BORDER": "rgba(168, 85, 247, 0.45)", "TEXT": "#c084fc"
+    },
+    "gold": {
+        "PRI": "#f59e0b", "PRI_DIM": "#78350f", "BG": "#0f0a02", 
+        "PANEL": "rgba(35, 28, 10, 0.70)", "BORDER": "rgba(245, 158, 11, 0.45)", "TEXT": "#fde68a"
+    },
+    "white": {
+        "PRI": "#e2e8f0", "PRI_DIM": "#64748b", "BG": "#050a14", 
+        "PANEL": "rgba(12, 22, 38, 0.7)", "BORDER": "rgba(226, 232, 240, 0.45)", "TEXT": "#cbd5e1"
+    }
+}
 
-# Override theme application to also sync our web sphere colors
-original_apply_theme_stylesheet = ui_compiled._apply_theme_stylesheet
+# Theme Tokens
+C_PRI = "#f59e0b"
+C_PRI_DIM = "#78350f"
+C_BG = "#0f0a02"
+C_PANEL = "rgba(35, 28, 10, 0.70)"
+C_BORDER = "rgba(245, 158, 11, 0.45)"
+C_TEXT = "#fde68a"
 
-def custom_apply_theme_stylesheet(app, name):
-    original_apply_theme_stylesheet(app, name)
-    for win in _active_windows:
-        if hasattr(win, 'orb') and hasattr(win.orb, 'sync_theme'):
-            win.orb.sync_theme()
+GREEN = "#00ff88"
+RED = "#ff3b30"
 
-ui_compiled._apply_theme_stylesheet = custom_apply_theme_stylesheet
+def apply_theme_tokens(theme_name: str):
+    global C_PRI, C_PRI_DIM, C_BG, C_PANEL, C_BORDER, C_TEXT
+    t = THEMES.get(theme_name.lower(), THEMES["gold"])
+    C_PRI = t["PRI"]
+    C_PRI_DIM = t["PRI_DIM"]
+    C_BG = t["BG"]
+    C_PANEL = t["PANEL"]
+    C_BORDER = t["BORDER"]
+    C_TEXT = t["TEXT"]
 
+try:
+    from memory.config_manager import load_api_keys
+    _theme_name = load_api_keys().get("jarvis_theme", "gold")
+    apply_theme_tokens(_theme_name)
+except Exception:
+    apply_theme_tokens("gold")
 
-# 2. Custom WebEngine-based ParticleOrb (Thread-safe signals!)
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtCore import pyqtSlot, QUrl, Qt, QObject, pyqtSignal
 
 class WebBridge(QObject):
     def __init__(self, orb):
@@ -47,28 +98,23 @@ class WebBridge(QObject):
 
     @pyqtSlot()
     def toggle_mute(self):
-        if hasattr(self.orb, 'parent_win') and self.orb.parent_win:
-            self.orb.parent_win._toggle_mute()
+        if self.orb.ui:
+            self.orb.ui._win._toggle_mute()
 
     @pyqtSlot()
     def request_theme(self):
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self.orb.sync_theme)
 
+
 class CustomParticleOrb(QWidget):
-    # PyQt signals MUST be defined as class attributes for thread-safe cross-thread calls!
     audio_signal = pyqtSignal(float)
     state_signal = pyqtSignal(str)
     theme_signal = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, ui, parent=None):
         super().__init__(parent)
-        self.parent_win = parent
+        self.ui = ui
         
-        # Link references
-        if self.parent_win:
-            self.parent_win.orb = self
-            
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -77,45 +123,36 @@ class CustomParticleOrb(QWidget):
         self.web_view.setStyleSheet("background: transparent;")
         self.web_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
         
-        # Optimize QWebEngineView settings to aggressively save RAM (up to 150MB+ memory reduction)
         try:
             from PyQt6.QtWebEngineCore import QWebEngineSettings
             settings = self.web_view.settings()
-            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)   # Enabled for high-performance fluid rendering
-            settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)  # Disable Flash/PDF plugins
-            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)  # No local storage needed
-            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, False)
-            print("[JARVIS] QWebEngineView optimized settings successfully applied.")
-        except Exception as e:
-            print(f"[JARVIS] Failed to apply WebEngine optimizations: {e}")
-        
-        # Setup QWebChannel
+            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, False)
+        except Exception:
+            pass
+            
         self.channel = QWebChannel()
         self.bridge = WebBridge(self)
         self.channel.registerObject("pyBridge", self.bridge)
         self.web_view.page().setWebChannel(self.channel)
         
-        # Load local assets/sphere.html
         sphere_path = Path(__file__).parent / "assets" / "sphere.html"
         self.web_view.setUrl(QUrl.fromLocalFile(str(sphere_path.absolute())))
         
         layout.addWidget(self.web_view)
         self.setLayout(layout)
         
-        # Connect signals to thread-safe slots executing on the main GUI thread
         self.audio_signal.connect(self._safe_set_audio)
         self.state_signal.connect(self._safe_set_state)
         self.theme_signal.connect(self._safe_sync_theme)
-        
         self.web_view.loadFinished.connect(self._on_load_finished)
         
     def _on_load_finished(self, ok):
         if ok:
             self.sync_theme()
-            if self.parent_win:
-                self.set_state('MUTED' if self.parent_win._muted else 'LISTENING')
+            self.set_state("MUTED" if self.ui.muted else "LISTENING")
 
-    # Thread-safe triggers called from any secondary thread (like the sounddevice thread)
     def sync_theme(self):
         self.theme_signal.emit()
 
@@ -125,13 +162,12 @@ class CustomParticleOrb(QWidget):
     def set_state(self, state: str):
         self.state_signal.emit(state)
 
-    # Slots that run safely inside the main GUI thread
     def _safe_sync_theme(self):
         colors = {
-            'PRI': ui_compiled.C.PRI,
-            'PRI_DIM': ui_compiled.C.PRI_DIM,
-            'TEXT': ui_compiled.C.TEXT,
-            'BG': ui_compiled.C.BG
+            'PRI': C_PRI,
+            'PRI_DIM': C_PRI_DIM,
+            'TEXT': C_TEXT,
+            'BG': C_BG
         }
         js_code = f"if (window.setThemeColors) window.setThemeColors({json.dumps(colors)});"
         self.web_view.page().runJavaScript(js_code)
@@ -145,344 +181,942 @@ class CustomParticleOrb(QWidget):
         self.web_view.page().runJavaScript(js_code)
 
 
-# 3. Custom MainWindow subclass
-class CustomMainWindow(ui_compiled.MainWindow):
-    def __init__(self, face_path):
-        super().__init__(face_path)
-        _active_windows.append(self)
+class ClockWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("ClockWidget")
+        self.update_style()
         
-        # Define a consistent medium size on startup and prevent squishing
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        layout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        
+        self.lbl_time = QLabel("12:00:00")
+        font_t = QFont("Century Gothic", 24, QFont.Weight.Bold)
+        font_t.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
+        self.lbl_time.setFont(font_t)
+        self.lbl_time.setStyleSheet("color: white; border: none; background: transparent;")
+        self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_time)
+        
+        self.lbl_date = QLabel("Monday, 24 May 2026")
+        self.lbl_date.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_date)
+        
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.tick)
+        self.timer.start(1000)
+        self.tick()
+        
+    def tick(self):
+        now = datetime.now(_BA_TZ)
+        self.lbl_time.setText(now.strftime("%I:%M:%S %p"))
+        self.lbl_date.setText(now.strftime("%A, %d %B %Y"))
+        
+    def update_style(self):
+        # Completely borderless and transparent for elegant floating style
+        self.setStyleSheet("""
+            QWidget#ClockWidget {
+                background: transparent;
+                border: none;
+            }
+        """)
+        if hasattr(self, "lbl_date"):
+            self.lbl_date.setStyleSheet(f"font-size: 11px; letter-spacing: 1px; color: {C_PRI}; border: none; background: transparent; font-weight: bold;")
+
+
+class WeatherWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("WeatherWidget")
+        self.update_style()
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 8, 15, 8)
+        
+        header = QHBoxLayout()
+        lbl_icon = QLabel()
+        if HAS_QTA:
+            lbl_icon.setPixmap(qta.icon('fa5s.cloud-sun', color=C_PRI).pixmap(18, 18))
+        header.addWidget(lbl_icon)
+        
+        self.lbl_title = QLabel("WEATHER REPORT")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        info = QHBoxLayout()
+        self.lbl_temp = QLabel("18°C")
+        self.lbl_temp.setStyleSheet("font-size: 20px; font-weight: bold; border: none; background: transparent; color: white;")
+        info.addWidget(self.lbl_temp)
+        
+        self.lbl_desc = QLabel("Parcialmente Nublado")
+        info.addWidget(self.lbl_desc)
+        info.addStretch()
+        layout.addLayout(info)
+        
+        details = QHBoxLayout()
+        self.lbl_humidity = QLabel("Humedad: 82%")
+        self.lbl_humidity.setStyleSheet("font-size: 10px; color: #94a3b8; border: none; background: transparent;")
+        self.lbl_wind = QLabel("Viento: 12 km/h")
+        self.lbl_wind.setStyleSheet("font-size: 10px; color: #94a3b8; border: none; background: transparent;")
+        
+        details.addWidget(self.lbl_humidity)
+        details.addWidget(self.lbl_wind)
+        details.addStretch()
+        layout.addLayout(details)
+        
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#WeatherWidget {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            self.lbl_desc.setStyleSheet(f"font-size: 11px; color: {C_TEXT}; border: none; background: transparent;")
+
+
+class SpotifyWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("SpotifyWidget")
+        self.update_style()
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        header = QHBoxLayout()
+        self.lbl_logo = QLabel()
+        if HAS_QTA:
+            self.lbl_logo.setPixmap(qta.icon('fa5b.spotify', color='#1DB954').pixmap(18, 18))
+        else:
+            self.lbl_logo.setText("🎵")
+        header.addWidget(self.lbl_logo)
+        
+        self.lbl_title = QLabel("SPOTIFY CONTROL")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        self.lbl_track = QLabel("Not Playing")
+        self.lbl_track.setStyleSheet("font-size: 13px; font-weight: bold; border: none; background: transparent; color: white;")
+        self.lbl_artist = QLabel("Awaiting tracks...")
+        layout.addWidget(self.lbl_track)
+        layout.addWidget(self.lbl_artist)
+        
+        controls = QHBoxLayout()
+        self.btn_shuffle = QPushButton()
+        self.btn_prev = QPushButton()
+        self.btn_play = QPushButton()
+        self.btn_next = QPushButton()
+        self.btn_heart = QPushButton()
+        
+        self.buttons_list = [
+            (self.btn_shuffle, 'fa5s.random', C_PRI_DIM),
+            (self.btn_prev, 'fa5s.step-backward', '#ffffff'),
+            (self.btn_play, 'fa5s.play', '#ffffff'),
+            (self.btn_next, 'fa5s.step-forward', '#ffffff'),
+            (self.btn_heart, 'fa5s.heart', RED)
+        ]
+        
+        for btn, icon, clr in self.buttons_list:
+            if HAS_QTA:
+                btn.setIcon(qta.icon(icon, color=clr))
+            btn.setFixedSize(30, 30)
+            controls.addWidget(btn)
+            
+        layout.addLayout(controls)
+        
+        self.btn_play.clicked.connect(lambda: self._press("playpause"))
+        self.btn_prev.clicked.connect(lambda: self._press("prevtrack"))
+        self.btn_next.clicked.connect(lambda: self._press("nexttrack"))
+        
+    def _press(self, key):
+        try:
+            import pyautogui
+            pyautogui.press(key)
+        except Exception:
+            pass
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#SpotifyWidget {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            self.lbl_artist.setStyleSheet(f"font-size: 11px; color: {C_PRI_DIM}; border: none; background: transparent;")
+            for btn, icon, clr in self.buttons_list:
+                btn.setStyleSheet(f"QPushButton {{ background: rgba(245,158,11,0.08); border: 1px solid {C_BORDER}; border-radius: 15px; }} QPushButton:hover {{ background: rgba(245,158,11,0.2); }}")
+
+
+class SystemWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("SystemWidget")
+        self.update_style()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        header = QHBoxLayout()
+        lbl_icon = QLabel()
+        if HAS_QTA:
+            lbl_icon.setPixmap(qta.icon('fa5s.bolt', color=C_PRI).pixmap(18, 18))
+        header.addWidget(lbl_icon)
+        
+        self.lbl_title = QLabel("SYSTEM GAUGES")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        self.cpu_bar = QProgressBar()
+        self.ram_bar = QProgressBar()
+        
+        self.bars = [(self.cpu_bar, "CPU Status"), (self.ram_bar, "RAM Status")]
+        for bar, label in self.bars:
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"font-size: 10px; color: {C_PRI_DIM}; border: none; background: transparent;")
+            layout.addWidget(lbl)
+            bar.setTextVisible(True)
+            layout.addWidget(bar)
+            
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_stats)
+        self.timer.start(1000)
+        self.update_stats()
+        
+    def update_stats(self):
+        try:
+            self.cpu_bar.setValue(int(psutil.cpu_percent()))
+            self.ram_bar.setValue(int(psutil.virtual_memory().percent))
+        except Exception:
+            pass
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#SystemWidget {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            for bar, label in self.bars:
+                bar.setStyleSheet(f"""
+                    QProgressBar {{
+                        border: 1px solid {C_BORDER};
+                        border-radius: 6px;
+                        text-align: center;
+                        background: transparent;
+                        color: white;
+                        height: 14px;
+                    }}
+                    QProgressBar::chunk {{
+                        background-color: {C_PRI};
+                        border-radius: 5px;
+                    }}
+                """)
+
+
+class TodoWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("TodoWidget")
+        self.update_style()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        header = QHBoxLayout()
+        lbl_icon = QLabel()
+        if HAS_QTA:
+            lbl_icon.setPixmap(qta.icon('fa5s.check-circle', color=C_PRI).pixmap(18, 18))
+        header.addWidget(lbl_icon)
+        
+        self.lbl_title = QLabel("TODOS")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        inp_layout = QHBoxLayout()
+        self.txt_task = QLineEdit()
+        self.txt_task.setPlaceholderText("New chore...")
+        inp_layout.addWidget(self.txt_task)
+        
+        self.btn_add = QPushButton("+")
+        inp_layout.addWidget(self.btn_add)
+        layout.addLayout(inp_layout)
+        
+        self.lst_todo = QListWidget()
+        self.lst_todo.setStyleSheet("QListWidget { border: none; background: transparent; } QListWidget::item { padding: 4px; color: white; }")
+        layout.addWidget(self.lst_todo)
+        
+        self.btn_add.clicked.connect(self.add_task)
+        self.txt_task.returnPressed.connect(self.add_task)
+        
+    def add_task(self):
+        text = self.txt_task.text().strip()
+        if text:
+            item = QListWidgetItem(text)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            self.lst_todo.addItem(item)
+            self.txt_task.clear()
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#TodoWidget {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            self.txt_task.setStyleSheet(f"QLineEdit {{ background: rgba(0,0,0,0.3); border: 1px solid {C_BORDER}; border-radius: 6px; padding: 4px; color: white; }}")
+            self.btn_add.setStyleSheet(f"QPushButton {{ background: {C_PRI}; color: black; font-weight: bold; border-radius: 6px; padding: 4px 10px; }}")
+
+
+class NotesWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("NotesWidget")
+        self.update_style()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        header = QHBoxLayout()
+        lbl_icon = QLabel()
+        if HAS_QTA:
+            lbl_icon.setPixmap(qta.icon('fa5s.sticky-note', color=C_PRI).pixmap(18, 18))
+        header.addWidget(lbl_icon)
+        
+        self.lbl_title = QLabel("PAD NOTES")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        self.txt_notes = QTextEdit()
+        self.txt_notes.setPlaceholderText("Write details...")
+        layout.addWidget(self.txt_notes)
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#NotesWidget {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            self.txt_notes.setStyleSheet(f"QTextEdit {{ border: none; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 6px; color: white; }}")
+
+
+class FileDropZone(QWidget):
+    fileDropped = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.update_style()
+        layout = QVBoxLayout(self)
+        self.lbl = QLabel("Drop File Trigger")
+        self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl.setStyleSheet("border: none; background: transparent; font-weight: bold; color: white;")
+        layout.addWidget(self.lbl)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.setStyleSheet(f"QWidget {{ background: rgba(245,158,11,0.15); border: 2px dashed {C_PRI}; border-radius: 10px; }}")
+
+    def dragLeaveEvent(self, event):
+        self.update_style()
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if os.path.exists(path):
+                self.fileDropped.emit(path)
+                break
+        self.dragLeaveEvent(None)
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: rgba(0,0,0,0.25);
+                border: 1.5px dashed {C_BORDER};
+                border-radius: 10px;
+            }}
+        """)
+
+
+class FilesPanel(QWidget):
+    def __init__(self, ui, parent=None):
+        super().__init__(parent)
+        self.ui = ui
+        self.setObjectName("FilesPanel")
+        self.update_style()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        header = QHBoxLayout()
+        lbl_icon = QLabel()
+        if HAS_QTA:
+            lbl_icon.setPixmap(qta.icon('fa5s.folder-open', color=C_PRI).pixmap(18, 18))
+        header.addWidget(lbl_icon)
+        
+        self.lbl_title = QLabel("FILES DROP")
+        header.addWidget(self.lbl_title)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        self.drop_zone = FileDropZone()
+        self.drop_zone.fileDropped.connect(self.on_file_dropped)
+        layout.addWidget(self.drop_zone)
+        
+        self.lbl_current = QLabel("Ready for drops.")
+        layout.addWidget(self.lbl_current)
+        
+    def on_file_dropped(self, path):
+        self.ui.current_file = path
+        name = os.path.basename(path)
+        self.lbl_current.setText(f"Active: {name}")
+        self.ui.write_log(f"📁 Drops linked: {name}")
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QWidget#FilesPanel {{
+                background: {C_PANEL};
+                border: 1.5px solid {C_BORDER};
+                border-radius: 12px;
+            }}
+        """)
+        if hasattr(self, "lbl_title"):
+            self.lbl_title.setStyleSheet(f"font-weight: bold; font-size: 11px; letter-spacing: 2px; color: {C_PRI}; border: none; background: transparent;")
+            self.lbl_current.setStyleSheet(f"font-size: 10px; color: {C_PRI_DIM}; border: none; background: transparent;")
+            self.drop_zone.update_style()
+
+
+class DeviceSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("JARVIS Settings Configuration Control")
+        self.resize(550, 480)
+        self.update_style()
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        
+        layout.addWidget(QLabel("<h2>System Master Configurations</h2>"))
+        
+        layout.addWidget(QLabel("Gemini API Key:"))
+        self.inp_gemini = QLineEdit()
+        self.inp_gemini.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.inp_gemini)
+        
+        layout.addWidget(QLabel("OpenRouter API Key:"))
+        self.inp_openrouter = QLineEdit()
+        self.inp_openrouter.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.inp_openrouter)
+        
+        layout.addWidget(QLabel("Active Voice Model:"))
+        self.cmb_voice = QComboBox()
+        self.voices = [
+            ("Aoede", "Femenina (Cálida y sofisticada ✨)"),
+            ("Kore", "Femenina (Suave y precisa)"),
+            ("Leda", "Femenina (Natural y fluida)"),
+            ("Zephyr", "Femenina (Dinámica y expresiva)"),
+            ("Charon", "Masculina (Profunda y seria)"),
+            ("Puck", "Masculina (Ágil y versátil)"),
+            ("Fenrir", "Masculina (Grave y autoritaria)"),
+            ("Orus", "Masculina (Clásica y equilibrada)")
+        ]
+        for val, desc in self.voices:
+            self.cmb_voice.addItem(desc, val)
+        layout.addWidget(self.cmb_voice)
+        
+        layout.addWidget(QLabel("Theme Palette Scheme:"))
+        self.cmb_theme = QComboBox()
+        for k in THEMES.keys():
+            self.cmb_theme.addItem(k.upper(), k)
+        layout.addWidget(self.cmb_theme)
+        
+        layout.addWidget(QLabel("Microphone Input Device:"))
+        self.cmb_mic = QComboBox()
+        layout.addWidget(self.cmb_mic)
+        
+        layout.addWidget(QLabel("Speaker Output Device:"))
+        self.cmb_speaker = QComboBox()
+        layout.addWidget(self.cmb_speaker)
+        
+        self.chk_gpu = QCheckBox("Enable GPU Rendering Acceleration")
+        layout.addWidget(self.chk_gpu)
+        
+        btn_layout = QHBoxLayout()
+        self.btn_save = QPushButton("Save Configurations")
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.btn_save)
+        layout.addLayout(btn_layout)
+        
+        self.btn_save.clicked.connect(self.save)
+        self.load_settings()
+        
+    def load_settings(self):
+        try:
+            import sounddevice as sd
+            devices = sd.query_devices()
+            
+            self.cmb_mic.addItem("Default Microphone Input", "")
+            for i, dev in enumerate(devices):
+                if dev.get("max_input_channels", 0) > 0:
+                    self.cmb_mic.addItem(dev["name"], i)
+                    
+            self.cmb_speaker.addItem("Default Speaker Output", "")
+            for i, dev in enumerate(devices):
+                if dev.get("max_output_channels", 0) > 0:
+                    self.cmb_speaker.addItem(dev["name"], i)
+        except Exception:
+            pass
+            
+        try:
+            from memory.config_manager import load_api_keys
+            cfg = load_api_keys()
+            
+            self.inp_gemini.setText(cfg.get("gemini_api_key", ""))
+            self.inp_openrouter.setText(cfg.get("openrouter_api_key", ""))
+            self.chk_gpu.setChecked(cfg.get("gpu_acceleration", False))
+            
+            voice = cfg.get("jarvis_voice", "Aoede")
+            for idx in range(self.cmb_voice.count()):
+                if self.cmb_voice.itemData(idx) == voice:
+                    self.cmb_voice.setCurrentIndex(idx)
+                    break
+                    
+            theme = cfg.get("jarvis_theme", "gold")
+            idx = self.cmb_theme.findData(theme)
+            if idx >= 0:
+                self.cmb_theme.setCurrentIndex(idx)
+                
+            mic = cfg.get("mic_device", "")
+            idx = self.cmb_mic.findData(mic)
+            if idx >= 0: self.cmb_mic.setCurrentIndex(idx)
+            
+            spk = cfg.get("speaker_device", "")
+            idx = self.cmb_speaker.findData(spk)
+            if idx >= 0: self.cmb_speaker.setCurrentIndex(idx)
+            
+        except Exception:
+            pass
+            
+    def save(self):
+        try:
+            from memory.config_manager import save_api_keys
+            theme_val = self.cmb_theme.currentData()
+            
+            cfg = {
+                "gemini_api_key": self.inp_gemini.text().strip(),
+                "openrouter_api_key": self.inp_openrouter.text().strip(),
+                "jarvis_voice": self.cmb_voice.currentData(),
+                "jarvis_theme": theme_val,
+                "gpu_acceleration": self.chk_gpu.isChecked(),
+                "mic_device": self.cmb_mic.currentData(),
+                "speaker_device": self.cmb_speaker.currentData()
+            }
+            save_api_keys(cfg)
+            
+            apply_theme_tokens(theme_val)
+            
+            parent = self.parent()
+            if parent:
+                parent.update_theme_styles()
+                
+            QMessageBox.information(self, "Success", "JARVIS Configurations saved, sir.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
+
+    def update_style(self):
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {C_BG};
+                border: 2px solid {C_PRI};
+                border-radius: 10px;
+            }}
+            QLabel {{
+                color: {C_TEXT};
+                font-weight: bold;
+            }}
+            QLineEdit, QComboBox {{
+                background: rgba(0,0,0,0.4);
+                border: 1px solid {C_BORDER};
+                color: white;
+                padding: 5px;
+                border-radius: 4px;
+            }}
+            QCheckBox {{
+                color: {C_PRI};
+                font-weight: bold;
+            }}
+            QPushButton {{
+                background-color: {C_PRI};
+                color: black;
+                font-weight: bold;
+                padding: 6px 15px;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: white;
+            }}
+        """)
+
+
+class MainWindow(QMainWindow):
+    _shutdown_sig = pyqtSignal()
+
+    def __init__(self, ui, face_path):
+        super().__init__()
+        self.ui = ui
+        self.ui._win = self
+        
         self.resize(1050, 760)
         self.setMinimumSize(1000, 750)
         
-        # Make the window frameless (no native OS borders) and translucent
-        from PyQt6.QtCore import Qt
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
-        # Set a gorgeous dark-gold glassmorphic background with rounded corners and glowing border
-        self.setStyleSheet("""
-            QMainWindow {
-                background: transparent;
-            }
-        """)
+        self.central_widget = QWidget(self)
+        self.central_widget.setObjectName("centralWidget")
+        self.setCentralWidget(self.central_widget)
         
-        # ID-specific styling for the central widget to avoid polluting child widgets with borders!
-        if self.centralWidget():
-            self.centralWidget().setObjectName("myCentralWidget")
-            self.centralWidget().setStyleSheet("""
-                QWidget#myCentralWidget {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(28, 21, 6, 0.88), stop:1 rgba(10, 7, 2, 0.88));
-                    border: 2px solid rgba(245, 158, 11, 0.45);
-                    border-radius: 20px;
-                }
-            """)
+        icon_path = Path(__file__).parent / "assets" / "jarvis_icono.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
             
-        # Premium elegant typography for the 'JARVIS' title label
-        from PyQt6.QtWidgets import QWidget, QPushButton, QLabel
-        from PyQt6.QtGui import QFont, QIcon
-        from PyQt6.QtCore import QSize
-        for child in self.findChildren(QWidget):
-            if hasattr(child, 'text') and child.text():
-                txt = child.text()
-                # Find the J-A-R-V-I-S label
-                if 'J' in txt and 'R' in txt and len(txt) < 25:
-                    font = QFont("Century Gothic", 16)
-                    font.setBold(True)
-                    font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 8.0)
-                    child.setFont(font)
-                    child.setStyleSheet("color: #f59e0b; font-weight: bold; background: transparent;")
-
-        # ──────────────────────────────────────────────────────────────
-        # FIX: Restyle the top header bar and bottom input bar from
-        # blue-ish (#030a10) to a warm dark-gold tone matching the
-        # overall glassmorphic palette
-        # ──────────────────────────────────────────────────────────────
-        _HEADER_BG  = "#0f0a02"  # Warm near-black gold base
-        _BORDER_DIM = "rgba(120, 53, 15, 0.45)"  # Subtle amber separator
-        _BTN_DIM    = "#b45309"  # Amber-700 for dim buttons
-        _BTN_BRIGHT = "#f59e0b"  # Amber-500 for hover/active
-
-        for child in self.centralWidget().children():
-            if isinstance(child, QWidget):
-                ss = child.styleSheet()
-                # Top header bar
-                if 'background:#030a10' in ss and 'border-bottom' in ss:
-                    child.setStyleSheet(f"background:{_HEADER_BG}; border-bottom:1px solid {_BORDER_DIM};")
-                    # Restyle all buttons inside the top bar
-                    for btn in child.findChildren(QPushButton):
-                        btn.setStyleSheet(f"""
-                            QPushButton {{
-                                background: transparent; color: {_BTN_DIM};
-                                border: 1px solid rgba(120,53,15,0.35); border-radius: 12px;
-                            }}
-                            QPushButton:hover {{ color: {_BTN_BRIGHT}; border-color: {_BTN_BRIGHT}; background: rgba(245,158,11,0.08); }}
-                        """)
-                # Bottom input bar
-                elif 'background:#030a10' in ss and 'border-top' in ss:
-                    child.setStyleSheet(f"background:{_HEADER_BG}; border-top:1px solid {_BORDER_DIM};")
-                    for btn in child.findChildren(QPushButton):
-                        old_ss = btn.styleSheet()
-                        # Keep the green mic button green, restyle other bottom buttons
-                        if '#00ff88' not in old_ss and '#ff3355' not in old_ss:
-                            btn.setStyleSheet(f"""
-                                QPushButton {{
-                                    background: rgba(245,158,11,0.08); color: {_BTN_DIM};
-                                    border: 1px solid rgba(120,53,15,0.35); border-radius: 15px;
-                                }}
-                                QPushButton:hover {{ color: {_BTN_BRIGHT}; border-color: {_BTN_BRIGHT}; }}
-                            """)
-
-        # ──────────────────────────────────────────────────────────────
-        # PROFESSIONAL ICONS with qtawesome (Font Awesome 6)
-        # Replaces generic Unicode emojis with crisp vector icons
-        # ──────────────────────────────────────────────────────────────
-        if HAS_QTA:
-            self._apply_professional_icons()
-
-        # Style individual bento card widgets with a premium translucent glowing golden background
-        for w in [self._spotify_w, self._system_w, self._todo_w, self._notes_w, self._files_panel]:
-            name = w.objectName() or f"bento_{id(w)}"
-            w.setObjectName(name)
-            w.setStyleSheet(f"""
-                QWidget#{name} {{
-                    background: rgba(35, 28, 10, 0.65);
-                    border: 1.5px solid rgba(245, 158, 11, 0.4);
-                    border-radius: 12px;
-                }}
-            """)
+        self.header_container = QWidget(self.central_widget)
+        header_bar = QHBoxLayout(self.header_container)
+        header_bar.setContentsMargins(15, 8, 15, 8)
         
-        # Hide the GridCanvas (the HUD grid frame around the orb)
-        for child in self.findChildren(QWidget):
-            if child.__class__.__name__ == 'GridCanvas':
-                child.hide()
-                
-        # Ensure the orb area container has absolutely no borders or outlines
-        self._orb_area.setObjectName("myOrbArea")
-        self._orb_area.setStyleSheet("QWidget#myOrbArea { border: none; background: transparent; }")
+        self.lbl_brand = QLabel("J A R V I S")
+        font = QFont("Century Gothic", 16, QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 8.0)
+        self.lbl_brand.setFont(font)
+        header_bar.addWidget(self.lbl_brand)
+        header_bar.addStretch()
         
-        # Remove orb from parent layout so its geometry is fully custom and resizable
-        if hasattr(self, 'orb') and self.orb:
-            layout = self._orb_area.layout()
-            if layout:
-                layout.removeWidget(self.orb)
-            self.orb.setParent(self._orb_area)
-            self.orb.show()
+        self.btn_settings = QPushButton()
+        self.btn_play = QPushButton()
+        self.btn_folder = QPushButton()
+        self.btn_min = QPushButton()
+        self.btn_close = QPushButton()
         
-        # Create bento container for aligned widgets using QGridLayout
-        from PyQt6.QtWidgets import QGridLayout
+        self.head_buttons = [
+            (self.btn_settings, 'fa5s.cog', self._open_settings),
+            (self.btn_play, 'fa5s.play', self._toggle_mute),
+            (self.btn_folder, 'fa5s.folder', self._open_folder),
+            (self.btn_min, 'fa5s.window-minimize', self.showMinimized),
+            (self.btn_close, 'fa5s.times', self.close)
+        ]
         
-        self._bento_container = QWidget(self._orb_area)
-        self._bento_container.setStyleSheet("background: transparent;")
+        for btn, icon, cb in self.head_buttons:
+            btn.setFixedSize(28, 28)
+            btn.clicked.connect(cb)
+            header_bar.addWidget(btn)
+            
+        self.orb = CustomParticleOrb(self.ui, self.central_widget)
+        self.orb.lower()
         
-        self._bento_layout = QGridLayout(self._bento_container)
-        self._bento_layout.setContentsMargins(0, 0, 0, 0)
-        self._bento_layout.setSpacing(15)
+        # Symmetrical Bento overlay dashboard container at bottom half
+        self.bento_container = QWidget(self.central_widget)
+        bento_layout = QGridLayout(self.bento_container)
+        bento_layout.setContentsMargins(0, 0, 0, 0)
+        bento_layout.setSpacing(15)
         
-        # Set equal stretch for all three columns so they never squeeze or squish Spotify!
-        self._bento_layout.setColumnStretch(0, 1)
-        self._bento_layout.setColumnStretch(1, 1)
-        self._bento_layout.setColumnStretch(2, 1)
+        # Aligned stretches
+        bento_layout.setColumnStretch(0, 1)
+        bento_layout.setColumnStretch(1, 1)
+        bento_layout.setColumnStretch(2, 1)
+        bento_layout.setColumnStretch(3, 1)
         
-        # Aligned dashboard bento layout mapping (Spotify spans 2 columns, Weather removed)
-        self._bento_layout.addWidget(self._spotify_w, 0, 0, 1, 2)
-        self._bento_layout.addWidget(self._system_w, 0, 2, 1, 1)
-        self._bento_layout.addWidget(self._todo_w, 1, 0, 1, 1)
-        self._bento_layout.addWidget(self._notes_w, 1, 1, 1, 1)
-        self._bento_layout.addWidget(self._files_panel, 1, 2, 1, 1)
+        self.spotify_w = SpotifyWidget()
+        self.system_w = SystemWidget()
+        self.todo_w = TodoWidget()
+        self.notes_w = NotesWidget()
+        self.files_panel = FilesPanel(self.ui)
+        self.weather_w = WeatherWidget()
         
-        # Populate bento dashboard on startup (Weather is hidden)
-        self._spotify_w.show()
-        self._weather_w.hide()
-        self._system_w.show()
-        self._todo_w.show()
-        self._notes_w.show()
-        self._files_panel.show()
-
-    # ──────────────────────────────────────────────────────────────────────
-    # Professional icon injection using qtawesome (Font Awesome 6)
-    # ──────────────────────────────────────────────────────────────────────
-    def _apply_professional_icons(self):
-        from PyQt6.QtWidgets import QPushButton, QLabel
-        from PyQt6.QtGui import QFont, QIcon
-        from PyQt6.QtCore import QSize
-
-        _HEADER_BG = '#0f0a02'
-        GOLD       = '#f59e0b'
-        GOLD_DIM   = '#b45309'
-        GREEN      = '#1DB954'  # Spotify brand green
-        WHITE      = '#fde68a'
-        RED        = '#ff3355'
-        ICO_SZ     = QSize(16, 16)
-        ICO_MD     = QSize(20, 20)
-        ICO_LG     = QSize(26, 26)
-
-        # Helper: set a qta icon on a QPushButton by matching its current text
-        def _set_btn_icon(card, text_match, icon_name, color=GOLD, size=ICO_MD):
-            for btn in card.findChildren(QPushButton):
-                try:
-                    if btn.text().strip() == text_match:
-                        btn.setIcon(qta.icon(icon_name, color=color))
-                        btn.setIconSize(size)
-                        btn.setText('')
-                        return btn
-                except Exception:
-                    pass
-            return None
-
-        # Helper: set a qta icon on a QLabel by matching its current text
-        def _set_lbl_icon(card, text_match, icon_name, color=GOLD, size=ICO_SZ):
-            for lbl in card.findChildren(QLabel):
-                try:
-                    if lbl.text().strip() == text_match:
-                        lbl.setPixmap(qta.icon(icon_name, color=color).pixmap(size))
-                        return lbl
-                except Exception:
-                    pass
-            return None
-
-        # ─── SPOTIFY CARD ────────────────────────────────────────────
-        sp = self._spotify_w
-        _set_lbl_icon(sp, '\u266b', 'fa5b.spotify',  color=GREEN, size=ICO_MD)  # ♫ header icon → Spotify logo
-        _set_lbl_icon(sp, '\u266a', 'fa5b.spotify',  color=GREEN, size=ICO_SZ)  # ♪ → Spotify
-        _set_lbl_icon(sp, '\U0001f50a', 'fa5s.volume-up', color=GOLD_DIM, size=ICO_SZ)  # 🔊 → volume icon
-        _set_btn_icon(sp, '\U0001f500', 'fa5s.random',    color=GOLD_DIM, size=ICO_SZ)  # 🔀 → shuffle
-        _set_btn_icon(sp, '\u23ee',     'fa5s.step-backward', color=WHITE, size=ICO_MD)  # ⏮ → prev
-        _set_btn_icon(sp, '\u23f8',     'fa5s.pause',     color=WHITE, size=ICO_LG)      # ⏸ → pause
-        _set_btn_icon(sp, '\u23ed',     'fa5s.step-forward', color=WHITE, size=ICO_MD)   # ⏭ → next
-        _set_btn_icon(sp, '\u2661',     'fa5s.heart',     color=RED,   size=ICO_MD)      # ♡ → heart
-        _set_btn_icon(sp, '\u2581',     'fa5s.volume-off',  color=GOLD_DIM, size=ICO_SZ) # ▁ vol 1
-        _set_btn_icon(sp, '\u2583',     'fa5s.volume-down', color=GOLD_DIM, size=ICO_SZ) # ▃ vol 2
-        _set_btn_icon(sp, '\u2585',     'fa5s.volume-down', color=GOLD,     size=ICO_SZ) # ▅ vol 3
-        _set_btn_icon(sp, '\u2587',     'fa5s.volume-up',   color=GOLD,     size=ICO_SZ) # ▇ vol 4
-
-        # ─── SYSTEM CARD ─────────────────────────────────────────────
-        sy = self._system_w
-        _set_lbl_icon(sy, '\u26a1', 'fa5s.bolt',  color=GOLD, size=ICO_MD)   # ⚡ → bolt
-
-        # ─── TODO CARD ───────────────────────────────────────────────
-        td = self._todo_w
-        _set_lbl_icon(td, '\u2713', 'fa5s.check-circle', color=GREEN, size=ICO_MD)  # ✓ → checkmark
-        _set_btn_icon(td, '+',      'fa5s.plus-circle',  color=GOLD,  size=ICO_MD)  # + → plus
-
-        # ─── NOTES CARD ──────────────────────────────────────────────
-        nt = self._notes_w
-        _set_lbl_icon(nt, '\U0001f4dd', 'fa5s.sticky-note', color=GOLD, size=ICO_MD)  # 📝 → note
-
-        # ─── FILES PANEL ─────────────────────────────────────────────
-        fp = self._files_panel
-        _set_lbl_icon(fp, '\U0001f4c1', 'fa5s.folder-open', color=GOLD, size=ICO_MD)  # 📁 → folder
-
-        # ─── CLOSE (✕) BUTTONS on all cards → fa5s.times ─────────
-        for card in [sp, sy, td, nt, fp]:
-            _set_btn_icon(card, '\u2715', 'fa5s.times', color='#78350f', size=ICO_SZ)
-
-        # ─── DRAG HANDLE (⠿) LABELS on bento cards → fa5s.grip-vertical ─
-        for card in [sp, sy, td, nt]:
-            _set_lbl_icon(card, '\u283f', 'fa5s.grip-vertical', color='#78350f', size=ICO_SZ)
-
-        # ─── STATUS DOT (●) LABELS → fa5s.circle ────────────────
-        for card in [sp, sy, td, nt]:
-            _set_lbl_icon(card, '\u25cf', 'fa5s.circle', color=GREEN, size=QSize(8, 8))
-
-        # ─── TOP BAR BUTTONS ─────────────────────────────────────
-        # Settings ⚙, Play ▸, Folder 📁
-        for child in self.centralWidget().children():
-            if isinstance(child, QWidget):
-                ss = child.styleSheet()
-                if 'border-bottom' in ss and (_HEADER_BG in ss or '#030a10' in ss or '#0f0a02' in ss):
-                    for btn in child.findChildren(QPushButton):
-                        t = btn.text().strip()
-                        if t == '\u2699':       # ⚙ settings
-                            btn.setIcon(qta.icon('fa5s.cog', color=GOLD_DIM))
-                            btn.setIconSize(ICO_MD)
-                            btn.setText('')
-                        elif t == '\u25b8':     # ▸ play
-                            btn.setIcon(qta.icon('fa5s.play', color=GOLD_DIM))
-                            btn.setIconSize(ICO_MD)
-                            btn.setText('')
-                        elif t == '\U0001f4c1': # 📁 folder
-                            btn.setIcon(qta.icon('fa5s.folder', color=GOLD_DIM))
-                            btn.setIconSize(ICO_MD)
-                            btn.setText('')
-                    break
+        # Highly Organized Symmetrical 2-row, 4-column layout at bottom half
+        # Row 0
+        bento_layout.addWidget(self.spotify_w, 0, 0, 1, 2)
+        bento_layout.addWidget(self.weather_w, 0, 2, 1, 1)
+        bento_layout.addWidget(self.system_w, 0, 3, 1, 1)
         
-    def closeEvent(self, event):
-        if self in _active_windows:
-            _active_windows.remove(self)
-        super().closeEvent(event)
+        # Row 1
+        bento_layout.addWidget(self.todo_w, 1, 0, 1, 1)
+        bento_layout.addWidget(self.notes_w, 1, 1, 1, 2)
+        bento_layout.addWidget(self.files_panel, 1, 3, 1, 1)
         
+        # Clean floating digital Clock Widget at top-right corner
+        self.clock_w = ClockWidget(self.central_widget)
+        
+        # Dedicated Holographic Closed Captions Speech Area (Single centered line)
+        self.txt_console = QLabel(self.central_widget)
+        self.txt_console.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.txt_console.setWordWrap(True)
+        
+        # Force Close flag and System Tray initialization
+        self._force_close = False
+        self.tray_icon = None
+        self._setup_tray_icon()
+        
+        self.update_theme_styles()
+        self._drag_pos = None
+        self._shutdown_sig.connect(self._handle_shutdown)
+
+    def update_theme_styles(self):
+        self.central_widget.setStyleSheet(f"""
+            QWidget#centralWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(28, 21, 6, 0.90), stop:1 rgba(10, 7, 2, 0.90));
+                border: 2.2px solid {C_PRI};
+                border-radius: 20px;
+            }}
+        """)
+        self.lbl_brand.setStyleSheet(f"color: {C_PRI}; font-weight: bold; background: transparent;")
+        
+        for btn, icon, cb in self.head_buttons:
+            if HAS_QTA:
+                btn.setIcon(qta.icon(icon, color=C_PRI_DIM))
+            btn.setStyleSheet(f"QPushButton {{ background: transparent; border: 1px solid rgba(120,53,15,0.35); border-radius: 14px; }} QPushButton:hover {{ background: rgba(245,158,11,0.1); border-color: {C_PRI}; }}")
+            
+        self.txt_console.setStyleSheet(f"QLabel {{ color: {C_PRI}; font-weight: bold; font-size: 15px; background: transparent; }}")
+        
+        self.spotify_w.update_style()
+        self.system_w.update_style()
+        self.todo_w.update_style()
+        self.notes_w.update_style()
+        self.files_panel.update_style()
+        self.clock_w.update_style()
+        self.weather_w.update_style()
+        
+        if hasattr(self, "orb"):
+            self.orb.sync_theme()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(0, self._layout_orb_area)
+        W = self.central_widget.width()
+        H = self.central_widget.height()
+        
+        self.header_container.setGeometry(0, 0, W, 45)
+        
+        # Position digital Clock floating at top-right
+        self.clock_w.setGeometry(W - 260, 50, 240, 70)
+        
+        # Position background Particle Orb Web capsule
+        self.orb.setGeometry(0, 45, W, H - 45)
+        
+        # Position centered continuous speech line at bottom of HUD
+        self.txt_console.setGeometry(30, H - 60, W - 60, 45)
+        
+        # Bento overlay container Y starts lower and ends exactly flush on top of the subtitles (gap-free!)
+        bh = H // 3 + 30   # bottom-third height, lower widgets
+        by = H - bh - 60   # positioned flush directly above speech subtitles
+        self.bento_container.setGeometry(15, by, W - 30, bh)
+        
+        self.orb.lower()
+        self.bento_container.raise_()
+        self.txt_console.raise_()
+        self.clock_w.raise_()
 
-    def mousePressEvent(self, event):
-        from PyQt6.QtCore import Qt
+    def _open_settings(self):
+        dialog = DeviceSettingsDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if self.ui.on_config_saved:
+                from memory.config_manager import load_api_keys
+                self.ui.on_config_saved(load_api_keys())
+            
+    def _open_folder(self):
+        try:
+            from memory.config_manager import BASE_DIR
+            os.startfile(BASE_DIR)
+        except Exception:
+            pass
+            
+    def _toggle_mute(self):
+        self.ui.muted = not self.ui.muted
+        self.orb.set_state("MUTED" if self.ui.muted else "LISTENING")
+        if self.ui.muted:
+            if self.ui.on_stop_command:
+                self.ui.on_stop_command()
+
+    def _setup_tray_icon(self):
+        from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
+        self.tray_icon = QSystemTrayIcon(self)
+        icon_path = Path(__file__).parent / "assets" / "jarvis_icono.ico"
+        if icon_path.exists():
+            self.tray_icon.setIcon(QIcon(str(icon_path)))
+        else:
+            from PyQt6.QtWidgets import QStyle
+            self.tray_icon.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+            
+        tray_menu = QMenu(self)
+        
+        show_action = tray_menu.addAction("Mostrar JARVIS")
+        show_action.triggered.connect(self.show_and_activate)
+        
+        mute_action = tray_menu.addAction("Silenciar/Escuchar")
+        mute_action.triggered.connect(self._toggle_mute)
+        
+        tray_menu.addSeparator()
+        
+        exit_action = tray_menu.addAction("Salir")
+        exit_action.triggered.connect(self._exit_application)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self._on_tray_activated)
+        self.tray_icon.show()
+
+    def show_and_activate(self):
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+    def _exit_application(self):
+        self._force_close = True
+        self.close()
+
+    def _handle_shutdown(self):
+        self._force_close = True
+        self.close()
+
+    def _on_tray_activated(self, reason):
+        from PyQt6.QtWidgets import QSystemTrayIcon
+        if reason in (QSystemTrayIcon.ActivationReason.DoubleClick, QSystemTrayIcon.ActivationReason.Trigger):
+            if self.isVisible():
+                self.hide()
+            else:
+                self.show_and_activate()
+
+    def closeEvent(self, event):
+        if getattr(self, "_force_close", False):
+            event.accept()
+        else:
+            event.ignore()
+            self.hide()
+            if hasattr(self, "tray_icon") and self.tray_icon.isVisible():
+                from PyQt6.QtWidgets import QSystemTrayIcon
+                self.tray_icon.showMessage(
+                    "JARVIS AI",
+                    "Sigo activo en segundo plano. Presiona Insert para hablar o haz doble clic aquí para mostrarme.",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    3000
+                )
+
+    def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
-    def mouseMoveEvent(self, event):
-        from PyQt6.QtCore import Qt
-        if event.buttons() == Qt.MouseButton.LeftButton:
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._drag_pos and event.buttons() == Qt.MouseButton.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
+
+
+class MockRoot:
+    def __init__(self, qapp: QApplication):
+        self.qapp = qapp
         
-    def _build_input_strip(self):
-        outer = super()._build_input_strip()
-        outer.hide()
-        return outer
+    def mainloop(self):
+        sys.exit(self.qapp.exec())
+        
+    def after(self, ms: int, func):
+        QTimer.singleShot(ms, func)
 
-    def _layout_orb_area(self):
-        super()._layout_orb_area()
-        if hasattr(self, 'orb') and self.orb:
-            W = self._orb_area.width()
-            H = self._orb_area.height()
-            if getattr(self, '_orb_mini', False):
-                # Mini layout: place at bottom-left
-                mx = 18
-                my = H - 110 - 210 - 18
-                self.orb.setGeometry(mx, my, 210, 210)
-            else:
-                # Full size: cover the entire central widget (core + bottom transcript space)
-                # This positions the HTML capsule exactly at the bottom of the window
-                self.orb.setGeometry(0, 0, W, H)
 
-            # Bento grid container geometry: fits closer to the edges (no margins)
-            if hasattr(self, '_bento_container') and self._bento_container:
-                bh = H // 2 - 20 # Height of the bento grid area
-                by = H // 2 - 10 # Position it starting from the middle
-                bw = W - 30 # Leave tiny margin on the sides (15px each side)
-                bx = 15
-                self._bento_container.setGeometry(bx, by, bw, bh)
+class JarvisUI:
+    def __init__(self, face_path=""):
+        self.app = QApplication.instance() or QApplication(sys.argv)
+        self.root = MockRoot(self.app)
+        
+        self.muted = False
+        self.current_file = ""
+        
+        self.on_text_command = None
+        self.on_stop_command = None
+        self.on_config_saved = None
+        
+        self.jarvis_response_buffer = ""
+        
+        self._win = MainWindow(self, face_path)
+        self._win.show()
+        
+        # Ensure startup shortcut is set up after 2 seconds (so it doesn't block startup)
+        QTimer.singleShot(2000, self.ensure_startup_shortcut)
+        
+    def wait_for_api_key(self):
+        pass
+
+    def write_log(self, text: str):
+        pass
+        
+    def set_state(self, state: str):
+        self._win.orb.set_state(state)
+        if state == "MUTED":
+            self.muted = True
+        elif state in ("LISTENING", "SPEAKING", "THINKING"):
+            if self.muted:
+                self.muted = False
                 
-                # Z-order stacking adjustments:
-                self.orb.lower() # Push the 3D sphere to the background!
-                self._bento_container.raise_() # Bring the interactive Bento Grid to the front!
+    def set_audio_level(self, level: float):
+        self._win.orb.set_audio(level)
+        
+    def clear_jarvis_response(self):
+        self.jarvis_response_buffer = ""
+        self._win.txt_console.setText("")
+        
+    def stream_jarvis_chunk(self, chunk: str):
+        text = chunk.replace("JARVIS:", "").strip()
+        if text:
+            if self.jarvis_response_buffer:
+                self.jarvis_response_buffer += " " + text
+            else:
+                self.jarvis_response_buffer = text
+            self._win.txt_console.setText(self.jarvis_response_buffer)
 
-    def _build_beta_banner(self):
-        # Prevent the "Beta" or "Pasate a pro" banner from ever being created!
-        from PyQt6.QtWidgets import QWidget
-        widget = QWidget(self)
-        widget.hide()
-        return widget
-
-    def _style_mic(self, muted):
-        super()._style_mic(muted)
-        if hasattr(self, 'orb') and self.orb:
-            self.orb.set_state('MUTED' if muted else 'LISTENING')
-
-    def _show_widget(self, widget, make_orb_mini=False):
-        # Allow the widgets to remain in the locked Bento Grid layout stably
-        widget.show()
-        widget.raise_()
-
-
-# 4. Inject overridden classes into compiled module namespace
-ui_compiled.ParticleOrb = CustomParticleOrb
-ui_compiled.MainWindow = CustomMainWindow
-
-# Expose overridden classes in the public namespace of ui.py
-ParticleOrb = CustomParticleOrb
-MainWindow = CustomMainWindow
+    def ensure_startup_shortcut(self):
+        try:
+            import os
+            import subprocess
+            appdata = os.getenv('APPDATA')
+            if not appdata:
+                return
+            startup_dir = os.path.join(appdata, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+            shortcut_path = os.path.join(startup_dir, 'JARVIS AI.lnk')
+            
+            current_dir = os.path.abspath(os.path.dirname(__file__))
+            target_vbs = os.path.join(current_dir, "Iniciar JARVIS Beta.vbs")
+            icon_path = os.path.join(current_dir, "assets", "jarvis_icono.ico")
+            
+            if not os.path.exists(target_vbs):
+                return
+                
+            ps_cmd = (
+                f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{shortcut_path}');"
+                f"$s.TargetPath='{target_vbs}';"
+                f"$s.WorkingDirectory='{current_dir}';"
+                f"$s.IconLocation='{icon_path}';"
+                f"$s.Description='Lanzador Automatico de JARVIS AI (Admin)';"
+                f"$s.Save()"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            print("[STARTUP] Startup shortcut ensured successfully.")
+        except Exception as e:
+            print(f"[STARTUP] Error ensuring startup shortcut: {e}")

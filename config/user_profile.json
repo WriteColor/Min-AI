@@ -4,7 +4,16 @@
   "preferences": {
     "voice_preference": "fixed"
   },
-  "habits": {},
+  "habits": {
+    "windows_settings": 3,
+    "image_generation": 1,
+    "system_monitor": 1,
+    "knowledge_base": 1,
+    "jarvis_ui_control": 2,
+    "file_controller": 1,
+    "sleep_mode": 1,
+    "openrouter_agent": 1
+  },
   "frequent_actions": {
     "morning_brief": 7,
     "screen_vision": 31,

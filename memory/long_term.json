@@ -5,11 +5,11 @@
       "updated": "2026-05-21"
     },
     "honorific": {
-      "value": "Señor",
+      "value": "Se\u00f1or",
       "updated": "2026-05-17"
     },
     "name_spelling": {
-      "value": "Túpac (with accent on U)",
+      "value": "T\u00fapac (with accent on U)",
       "updated": "2026-05-17"
     },
     "city": {
@@ -23,13 +23,13 @@
   },
   "preferences": {
     "address_form": {
-      "value": "Señor",
+      "value": "Se\u00f1or",
       "updated": "2026-05-17"
     }
   },
   "projects": {
     "code_project_status": {
-      "value": "User is modifying a large (2000+ lines) demo code project because the premium version cannot be cracked. Added functions and changed aspects.",
+      "value": "User deleted the entire code project.",
       "updated": "2026-05-17"
     }
   },
