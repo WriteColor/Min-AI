@@ -98,6 +98,9 @@ class WindowsService:
         self._cached_processes: Dict[int, ProcessInfo] = {}
         self._process_cache_time = 0
         self._process_cache_ttl = 5  # seconds
+        self._cached_windows: Dict[int, WindowInfo] = {}
+        self._window_cache_time = 0
+        self._window_cache_ttl = 3  # seconds - windows change more frequently
         
     def _get_shell(self):
         """Obtiene referencia al Shell de Windows."""
@@ -191,49 +194,63 @@ class WindowsService:
             print(f"[WinService] get_window_info error: {e}")
             return None
     
-    def get_all_windows(self) -> List[WindowInfo]:
-        """Obtiene todas las ventanas visibles del sistema."""
+    def get_all_windows(self, refresh: bool = False) -> List[WindowInfo]:
+        """Obtiene todas las ventanas visibles del sistema con cache inteligente."""
         if not HAS_WIN32:
             return []
-        
+
+        now = time.time()
+        if not refresh and (now - self._window_cache_time) < self._window_cache_ttl:
+            return list(self._cached_windows.values())
+
         windows = []
-        
+        new_cache: Dict[int, WindowInfo] = {}
+
         def enum_callback(hwnd, _):
             if win32gui.IsWindowVisible(hwnd):
                 info = self.get_window_info(hwnd)
                 if info and info.title:
                     windows.append(info)
+                    new_cache[hwnd] = info
             return True
-        
+
         try:
             win32gui.EnumWindows(enum_callback, None)
+            self._cached_windows = new_cache
+            self._window_cache_time = now
         except Exception as e:
             print(f"[WinService] EnumWindows error: {e}")
-        
+
         return windows
+
+    def invalidate_window_cache(self):
+        """Invalida el cache de ventanas (llamar después de operaciones que cambien ventanas)."""
+        self._window_cache_time = 0
+
+    def get_cached_windows(self) -> List[WindowInfo]:
+        """Obtiene ventanas del cache sin refresh forzado."""
+        return list(self._cached_windows.values())
     
     def restore_window(self, hwnd: int, verify: bool = True) -> bool:
         """Restaura una ventana minimizada. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
-        
+
         try:
-            # Guardar estado antes
             was_minimized = win32gui.IsIconic(hwnd)
-            
-            # Ejecutar acción
+
             if was_minimized:
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
-            
-            # Verificar resultado
+
             if verify:
-                time.sleep(0.1)  # Esperar que se complete
+                time.sleep(0.1)
                 is_now_restored = not win32gui.IsIconic(hwnd)
                 is_foreground = win32gui.GetForegroundWindow() == hwnd
                 if not is_now_restored or not is_foreground:
-                    return False  # Falló la verificación
-            
+                    return False
+
+            self.invalidate_window_cache()
             return True
         except Exception as e:
             print(f"[WinService] restore_window error: {e}")
@@ -243,21 +260,19 @@ class WindowsService:
         """Minimiza una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
-        
+
         try:
-            # Guardar estado antes
             was_minimized = win32gui.IsIconic(hwnd)
-            
-            # Ejecutar acción
+
             win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
-            
-            # Verificar resultado
+
             if verify:
                 time.sleep(0.1)
                 is_now_minimized = win32gui.IsIconic(hwnd)
                 if not is_now_minimized:
-                    return False  # Falló la verificación
-            
+                    return False
+
+            self.invalidate_window_cache()
             return True
         except Exception as e:
             print(f"[WinService] minimize_window error: {e}")
@@ -267,20 +282,19 @@ class WindowsService:
         """Maximiza una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
-        
+
         try:
-            # Ejecutar acción
             win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-            
-            # Verificar resultado usando GetWindowPlacement
+
             if verify:
                 time.sleep(0.1)
                 placement = win32gui.GetWindowPlacement(hwnd)
                 show_cmd = placement[1]
-                is_now_maximized = (show_cmd == 3)  # SW_SHOWMAXIMIZED = 3
+                is_now_maximized = (show_cmd == 3)
                 if not is_now_maximized:
-                    return False  # Falló la verificación
-            
+                    return False
+
+            self.invalidate_window_cache()
             return True
         except Exception as e:
             print(f"[WinService] maximize_window error: {e}")
@@ -290,21 +304,19 @@ class WindowsService:
         """Cierra una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
-        
+
         try:
-            # Verificar que la ventana existe antes
             if not win32gui.IsWindow(hwnd):
-                return False  # Window already gone or invalid
-            
-            # Ejecutar acción
+                return False
+
             win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
-            
-            # Verificar resultado - esperar que la ventana se cierre
+
             if verify:
                 time.sleep(0.2)
                 if win32gui.IsWindow(hwnd):
-                    return False  # Window still exists - failed
-            
+                    return False
+
+            self.invalidate_window_cache()
             return True
         except Exception as e:
             print(f"[WinService] close_window error: {e}")

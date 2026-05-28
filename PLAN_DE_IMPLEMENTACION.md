@@ -600,11 +600,11 @@ fallback_chain = {
 - [x] 3.5 Implementación de provider para Local (Ollama/LM Studio/Custom)
 - [x] 3.6 Implementación de provider para OpenCode (opencode.ai) - modelos gratuitos
 - [x] 3.7 Implementación de provider para MiniMax (minimax.io) - modelos gratuitos
-- [ ] 3.8 Sistema de selección especializada de modelos por tipo de tarea
-- [ ] 3.9 Validación de combinaciones proveedor/modelo (interfaz muestra solo compatibles)
+- [x] 3.8 Sistema de selección especializada de modelos por tipo de tarea (ProviderRouter)
+- [x] 3.9 Validación de combinaciones proveedor/modelo (ModelSelector) IMPLEMENTED
 - [ ] 3.10 Sistema de autenticación por proveedor (API keys, tokens, etc.)
 - [ ] 3.11 Cambio dinámico de proveedor/modelo sin interrupciones
-- [ ] 3.12 Pipeline de fallback automático si proveedor falla
+- [x] 3.12 Pipeline de fallback automático si proveedor falla (ProviderRouter)
 
 ### 3.9 Archivos Afectados
 
@@ -617,8 +617,9 @@ fallback_chain = {
 | `providers/local_provider.py` | Crear | Provider para Ollama/LM Studio |
 | `providers/opencode_provider.py` | Crear | Provider para OpenCode (gratuito) |
 | `providers/minimax_provider.py` | Crear | Provider para MiniMax (gratuito) |
+| `providers/model_selector.py` | Crear | Selector y validador de modelos |
 | `providers/provider_manager.py` | Crear | Gestor centralizado de providers |
-| `core/provider_router.py` | Crear | Enrutador de providers |
+| `core/provider_router.py` | Crear | Enrutador de providers con fallback |
 | `main.py` | Actualizar | Integración con nuevo sistema |
 
 ---
@@ -830,7 +831,7 @@ Cada acción de control debe:
 - [x] 5.3 Detección de instancias activas de aplicaciones - find_running_app()
 - [x] 5.4 Restauración de ventanas minimizadas (no duplicar procesos) - launch_app() con check_running
 - [x] 5.5 Navegación de interfaces gráficas de aplicaciones - con validación post-ejecución
-- [ ] 5.6 Manipulación de archivos y directorios (robusta, no terminal)
+- [x] 5.6 Manipulación de archivos y directorios (robusta, no terminal) - actions/file_controller.py IMPLEMENTED
 - [ ] 5.7 Acceso a terminals (PowerShell, CMD)
 - [ ] 5.8 Control del escritorio (iconos, disposición)
 - [ ] 5.9 Configuración del sistema (sin abrir GUI innecesariamente)
@@ -917,7 +918,7 @@ El sistema debe entender jerarquía de ventanas:
 - [x] 6.3 Determinación de foco actual - win32gui.GetForegroundWindow()
 - [ ] 6.4 Análisis de jerarquía UI (ventanas padre/hija)
 - [x] 6.5 Lógica de decisión: abrir nuevo vs reutilizar existente - launch_app() con check_running
-- [ ] 6.6 Cacheo inteligente de información de ventanas
+- [x] 6.6 Cacheo inteligente de información de ventanas IMPLEMENTED
 - [ ] 6.7 Actualización de estado en tiempo real
 - [ ] 6.8 Historial de ventanas abiertas para contexto
 

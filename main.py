@@ -67,7 +67,7 @@ _TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="min-tool"
 
 try:
     from zoneinfo import ZoneInfo as _ZoneInfo
-    _BA_TZ = _ZoneInfo("America/Tegucigalpa")  # Default timezone (Central America)
+    _BA_TZ = _ZoneInfo("America/Tegucigalpa")  # Default timezone (Honduras)
 except Exception:
     from datetime import timezone as _tz, timedelta as _td
     _BA_TZ = _tz(_td(hours=-5))

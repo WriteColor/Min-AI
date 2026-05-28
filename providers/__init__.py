@@ -24,6 +24,13 @@ from .registry import (
     get_registry,
 )
 
+from .model_selector import (
+    ModelSelector,
+    ModelValidationResult,
+    get_model_selector,
+    COMPATIBLE_COMBINATIONS,
+)
+
 from .openai_provider import OpenAIProvider
 from .gemini_provider import GeminiProvider
 from .groq_provider import GroqProvider
@@ -42,13 +49,19 @@ __all__ = [
     "MultimodalProvider",
     "LocalProvider",
     "UnifiedProvider",
-    
+
     # Registry
     "ProviderRegistry",
     "ProviderManager",
     "get_provider_manager",
     "get_registry",
-    
+
+    # Model Selector
+    "ModelSelector",
+    "ModelValidationResult",
+    "get_model_selector",
+    "COMPATIBLE_COMBINATIONS",
+
     # Provider implementations
     "OpenAIProvider",
     "GeminiProvider",
@@ -57,7 +70,7 @@ __all__ = [
     "OpenRouterProvider",
     "OpenCodeProvider",
     "MiniMaxProvider",
-    
+
     # Utilities
     "register_provider",
     "get_provider_class",
