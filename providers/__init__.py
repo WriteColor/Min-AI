@@ -29,6 +29,8 @@ from .gemini_provider import GeminiProvider
 from .groq_provider import GroqProvider
 from .local_provider import LocalProvider
 from .openrouter_provider import OpenRouterProvider
+from .opencode_provider import OpenCodeProvider
+from .minimax_provider import MiniMaxProvider
 
 
 __all__ = [
@@ -53,6 +55,8 @@ __all__ = [
     "GroqProvider",
     "LocalProvider",
     "OpenRouterProvider",
+    "OpenCodeProvider",
+    "MiniMaxProvider",
     
     # Utilities
     "register_provider",

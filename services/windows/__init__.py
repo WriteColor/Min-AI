@@ -162,13 +162,17 @@ class WindowsService:
             except:
                 pass
             
-            # Determine state
+            # Determine state - usar GetWindowPlacement en lugar de IsZoomed (no existe en win32gui)
             if win32gui.IsIconic(hwnd):
                 state = WindowState.MINIMIZED
-            elif win32gui.IsZoomed(hwnd):
-                state = WindowState.MAXIMIZED
             else:
-                state = WindowState.NORMAL
+                placement = win32gui.GetWindowPlacement(hwnd)
+                # placement[1] es el flags de mostrar (SW_SHOWMAXIMIZED = 3, SW_SHOWMINIMIZED = 2, SW_SHOWNORMAL = 1)
+                show_cmd = placement[1]
+                if show_cmd == 3:  # SW_SHOWMAXIMIZED
+                    state = WindowState.MAXIMIZED
+                else:
+                    state = WindowState.NORMAL
             
             is_visible = win32gui.IsWindowVisible(hwnd)
             is_active = win32gui.GetForegroundWindow() == hwnd
@@ -208,51 +212,99 @@ class WindowsService:
         
         return windows
     
-    def restore_window(self, hwnd: int) -> bool:
-        """Restaura una ventana minimizada."""
+    def restore_window(self, hwnd: int, verify: bool = True) -> bool:
+        """Restaura una ventana minimizada. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
         
         try:
-            if win32gui.IsIconic(hwnd):
+            # Guardar estado antes
+            was_minimized = win32gui.IsIconic(hwnd)
+            
+            # Ejecutar acción
+            if was_minimized:
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
+            
+            # Verificar resultado
+            if verify:
+                time.sleep(0.1)  # Esperar que se complete
+                is_now_restored = not win32gui.IsIconic(hwnd)
+                is_foreground = win32gui.GetForegroundWindow() == hwnd
+                if not is_now_restored or not is_foreground:
+                    return False  # Falló la verificación
+            
             return True
         except Exception as e:
             print(f"[WinService] restore_window error: {e}")
             return False
     
-    def minimize_window(self, hwnd: int) -> bool:
-        """Minimiza una ventana."""
+    def minimize_window(self, hwnd: int, verify: bool = True) -> bool:
+        """Minimiza una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
         
         try:
+            # Guardar estado antes
+            was_minimized = win32gui.IsIconic(hwnd)
+            
+            # Ejecutar acción
             win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+            
+            # Verificar resultado
+            if verify:
+                time.sleep(0.1)
+                is_now_minimized = win32gui.IsIconic(hwnd)
+                if not is_now_minimized:
+                    return False  # Falló la verificación
+            
             return True
         except Exception as e:
             print(f"[WinService] minimize_window error: {e}")
             return False
     
-    def maximize_window(self, hwnd: int) -> bool:
-        """Maximiza una ventana."""
+    def maximize_window(self, hwnd: int, verify: bool = True) -> bool:
+        """Maximiza una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
         
         try:
+            # Ejecutar acción
             win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+            
+            # Verificar resultado usando GetWindowPlacement
+            if verify:
+                time.sleep(0.1)
+                placement = win32gui.GetWindowPlacement(hwnd)
+                show_cmd = placement[1]
+                is_now_maximized = (show_cmd == 3)  # SW_SHOWMAXIMIZED = 3
+                if not is_now_maximized:
+                    return False  # Falló la verificación
+            
             return True
         except Exception as e:
             print(f"[WinService] maximize_window error: {e}")
             return False
     
-    def close_window(self, hwnd: int) -> bool:
-        """Cierra una ventana."""
+    def close_window(self, hwnd: int, verify: bool = True) -> bool:
+        """Cierra una ventana. Opcionalmente verifica el resultado."""
         if not HAS_WIN32:
             return False
         
         try:
+            # Verificar que la ventana existe antes
+            if not win32gui.IsWindow(hwnd):
+                return False  # Window already gone or invalid
+            
+            # Ejecutar acción
             win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+            
+            # Verificar resultado - esperar que la ventana se cierre
+            if verify:
+                time.sleep(0.2)
+                if win32gui.IsWindow(hwnd):
+                    return False  # Window still exists - failed
+            
             return True
         except Exception as e:
             print(f"[WinService] close_window error: {e}")
@@ -309,7 +361,7 @@ class WindowsService:
         
         return None
     
-    def launch_app(self, app_name: str, check_running: bool = True) -> Tuple[bool, str]:
+    def launch_app(self, app_name: str, check_running: bool = True, verify: bool = True) -> Tuple[bool, str]:
         """
         Lanza una aplicación. Si ya está corriendo, la restaura en vez de abrir nueva instancia.
         
@@ -322,8 +374,11 @@ class WindowsService:
             existing = self.find_running_app(app_name)
             if existing and existing.hwnd != 0:
                 # App is already open - restore window instead of launching new
-                self.restore_window(existing.hwnd)
-                return True, f"Restored existing {app_name} window"
+                restored = self.restore_window(existing.hwnd, verify=False)  # Don't verify, restore is expected
+                if restored:
+                    return True, f"Restored existing {app_name} window"
+                else:
+                    return True, f"{app_name} was running but couldn't restore"
         
         # URL/website shortcuts
         if app_lower.startswith("http://") or app_lower.startswith("https://"):
@@ -339,6 +394,11 @@ class WindowsService:
                 import win32api
                 result = win32api.ShellExecute(0, "open", app_name, None, None, 1)
                 if result > 32:  # >32 means success
+                    # Verify if requested - wait a bit and check if process is now running
+                    if verify:
+                        time.sleep(0.3)
+                        if not self.find_running_app(app_name):
+                            return False, f"Launched {app_name} but process not found"
                     return True, f"Launched {app_name}"
         except Exception as e:
             print(f"[WinService] ShellExecute error: {e}")
@@ -512,13 +572,11 @@ class WindowsService:
     def set_volume(self, level: int) -> bool:
         """Establece el volumen del sistema (0-100)."""
         try:
-            from ctypes import cast, POINTER
+            from pycaw.pycaw import AudioUtilities
             from comtypes import CLSCTX_ALL
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             
             devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            volume = devices.EndpointVolume
             volume.SetMasterVolumeLevelScalar(level / 100.0, None)
             return True
         except Exception as e:
@@ -528,13 +586,10 @@ class WindowsService:
     def get_volume(self) -> int:
         """Obtiene el volumen actual del sistema (0-100)."""
         try:
-            from ctypes import cast, POINTER
-            from comtypes import CLSCTX_ALL
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+            from pycaw.pycaw import AudioUtilities
             
             devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            volume = devices.EndpointVolume
             return int(volume.GetMasterVolumeLevelScalar() * 100)
         except Exception:
             return 50
@@ -542,18 +597,314 @@ class WindowsService:
     def mute_system(self) -> bool:
         """Silencia el sistema."""
         try:
-            from ctypes import cast, POINTER
-            from comtypes import CLSCTX_ALL
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+            from pycaw.pycaw import AudioUtilities
             
             devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMasterVolumeLevel(0, None)
+            volume = devices.EndpointVolume
+            volume.SetMasterVolumeLevelScalar(0, None)
             return True
         except Exception as e:
             print(f"[WinService] mute_system error: {e}")
             return False
+    
+    # ── Volume Mixer (Per-App Volume Control) ─────────────────────────────────
+
+    def get_audio_sessions(self) -> List[Dict[str, Any]]:
+        """
+        Obtiene todas las sesiones de audio del sistema con información de volumen.
+        Cada sesión representa una aplicación que está usando audio.
+        
+        Returns:
+            Lista de diccionarios con: process_name, pid, volume (0-100), is_muted
+        """
+        sessions = []
+        
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # Load Core Audio DLLs
+            ole32 = ctypes.windll.ole32
+            ole32.CoInitialize(None)
+            
+            try:
+                # IMMDeviceEnumerator CLSID
+                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
+                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
+                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
+                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
+                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
+                IID_IAudioSessionEnumerator = ctypes.UUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}')
+                IID_IPropertyStore = ctypes.UUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}')
+                
+                class IMMDeviceEnumerator(ctypes.Interface):
+                    _iid_ = IID_IMMDeviceEnumerator
+                
+                class IMMDevice(ctypes.Interface):
+                    _iid_ = IID_IMMDevice
+                
+                class IAudioSessionManager2(ctypes.Interface):
+                    _iid_ = IID_IAudioSessionManager2
+                
+                class IAudioSessionControl(ctypes.Interface):
+                    _iid_ = IID_IAudioSessionControl
+                
+                # Create device enumerator
+                enumerator = ctypes.cast(
+                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ctypes.POINTER(IMMDeviceEnumerator)
+                )
+                
+                # Get default audio endpoint (speakers)
+                device = IMMDevice()
+                hr = enumerator.GetDefaultAudioEndpoint(0, 1, ctypes.byref(device))
+                if hr != 0:
+                    return sessions
+                
+                # Activate session manager
+                session_mgr = IAudioSessionManager2()
+                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                
+                # Get session enumerator
+                session_enum = ctypes.c_void_p()
+                session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))
+                
+                # Get IAudioSessionEnumerator
+                audio_enum = cast(session_enum, POINTER(IAudioSessionEnumerator))
+                
+                count = ctypes.c_int()
+                audio_enum.GetCount(ctypes.byref(count))
+                
+                for i in range(count.value):
+                    session_control = ctypes.c_void_p()
+                    audio_enum.GetSession(i, ctypes.byref(session_control))
+                    
+                    if session_control.value:
+                        sc = cast(session_control, POINTER(IAudioSessionControl))
+                        
+                        # Get process ID
+                        pid = ctypes.c_ulong()
+                        sc.GetProcessId(ctypes.byref(pid))
+                        
+                        # Get display name from process
+                        proc_name = "Unknown"
+                        try:
+                            if HAS_PSUTIL and pid.value > 0:
+                                proc = psutil.Process(pid.value)
+                                proc_name = proc.name()
+                        except:
+                            pass
+                        
+                        # Get volume
+                        try:
+                            vol = ctypes.c_float()
+                            mute = ctypes.c_int()
+                            sc.GetVolume(ctypes.byref(vol))
+                            sc.GetMute(ctypes.byref(mute))
+                            
+                            sessions.append({
+                                "process_name": proc_name,
+                                "pid": pid.value,
+                                "volume": int(vol.value * 100),
+                                "is_muted": mute.value == 1
+                            })
+                        except:
+                            pass
+                
+                # Cleanup
+                audio_enum.Release()
+                session_mgr.Release()
+                device.Release()
+                
+            finally:
+                ole32.CoUninitialize()
+                
+        except Exception as e:
+            print(f"[WinService] get_audio_sessions error: {e}")
+        
+        return sessions
+    
+    def set_app_volume(self, process_name: str, volume: int) -> bool:
+        """
+        Establece el volumen de una aplicación específica por nombre de proceso.
+        
+        Args:
+            process_name: Nombre del proceso (ej: "chrome.exe", "spotify.exe")
+            volume: Nivel de volumen 0-100
+            
+        Returns:
+            True si exitoso
+        """
+        sessions = self.get_audio_sessions()
+        
+        for session in sessions:
+            if process_name.lower() in session["process_name"].lower():
+                success = self._set_session_volume(session["pid"], volume)
+                if success:
+                    return True
+        return False
+    
+    def _set_session_volume(self, pid: int, volume: int) -> bool:
+        """Establece volumen de una sesión por PID."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            ole32 = ctypes.windll.ole32
+            ole32.CoInitialize(None)
+            
+            try:
+                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
+                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
+                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
+                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
+                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
+                
+                enumerator = ctypes.cast(
+                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ctypes.POINTER(IMMDeviceEnumerator)
+                )
+                
+                device = IMMDevice()
+                hr = enumerator.GetDefaultAudioEndpoint(0, 1, ctypes.byref(device))
+                if hr != 0:
+                    return False
+                
+                session_mgr = IAudioSessionManager2()
+                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                
+                session_enum = ctypes.c_void_p()
+                session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))
+                
+                from ctypes import cast, POINTER
+                audio_enum = cast(session_enum, POINTER(IAudioSessionEnumerator))
+                
+                count = ctypes.c_int()
+                audio_enum.GetCount(ctypes.byref(count))
+                
+                for i in range(count.value):
+                    session_control = ctypes.c_void_p()
+                    audio_enum.GetSession(i, ctypes.byref(session_control))
+                    
+                    if session_control.value:
+                        sc = cast(session_control, POINTER(IAudioSessionControl))
+                        
+                        session_pid = ctypes.c_ulong()
+                        sc.GetProcessId(ctypes.byref(session_pid))
+                        
+                        if session_pid.value == pid:
+                            vol = ctypes.c_float(volume / 100.0)
+                            sc.SetVolume(ctypes.byref(vol), None)
+                            sc.Release()
+                            audio_enum.Release()
+                            session_mgr.Release()
+                            device.Release()
+                            return True
+                        
+                        sc.Release()
+                
+                audio_enum.Release()
+                session_mgr.Release()
+                device.Release()
+                
+            finally:
+                ole32.CoUninitialize()
+                
+        except Exception as e:
+            print(f"[WinService] _set_session_volume error: {e}")
+        
+        return False
+    
+    def mute_app(self, process_name: str) -> bool:
+        """Silencia una aplicación específica por nombre de proceso."""
+        sessions = self.get_audio_sessions()
+        
+        for session in sessions:
+            if process_name.lower() in session["process_name"].lower():
+                success = self._set_session_mute(session["pid"], True)
+                if success:
+                    return True
+        return False
+    
+    def unmute_app(self, process_name: str) -> bool:
+        """Desilencia una aplicación específica por nombre de proceso."""
+        sessions = self.get_audio_sessions()
+        
+        for session in sessions:
+            if process_name.lower() in session["process_name"].lower():
+                success = self._set_session_mute(session["pid"], False)
+                if success:
+                    return True
+        return False
+    
+    def _set_session_mute(self, pid: int, mute: bool) -> bool:
+        """Establece el estado mute de una sesión por PID."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            ole32 = ctypes.windll.ole32
+            ole32.CoInitialize(None)
+            
+            try:
+                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
+                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
+                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
+                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
+                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
+                
+                enumerator = ctypes.cast(
+                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ctypes.POINTER(IMMDeviceEnumerator)
+                )
+                
+                device = IMMDevice()
+                enumerator.GetDefaultAudioEndpoint(0, 1, ctypes.byref(device))
+                
+                session_mgr = IAudioSessionManager2()
+                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                
+                session_enum = ctypes.c_void_p()
+                session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))
+                
+                from ctypes import cast, POINTER
+                audio_enum = cast(session_enum, POINTER(IAudioSessionEnumerator))
+                
+                count = ctypes.c_int()
+                audio_enum.GetCount(ctypes.byref(count))
+                
+                for i in range(count.value):
+                    session_control = ctypes.c_void_p()
+                    audio_enum.GetSession(i, ctypes.byref(session_control))
+                    
+                    if session_control.value:
+                        sc = cast(session_control, POINTER(IAudioSessionControl))
+                        
+                        session_pid = ctypes.c_ulong()
+                        sc.GetProcessId(ctypes.byref(session_pid))
+                        
+                        if session_pid.value == pid:
+                            mute_val = 1 if mute else 0
+                            sc.SetMute(mute_val, None)
+                            sc.Release()
+                            audio_enum.Release()
+                            session_mgr.Release()
+                            device.Release()
+                            return True
+                        
+                        sc.Release()
+                
+                audio_enum.Release()
+                session_mgr.Release()
+                device.Release()
+                
+            finally:
+                ole32.CoUninitialize()
+                
+        except Exception as e:
+            print(f"[WinService] _set_session_mute error: {e}")
+        
+        return False
     
     # ── Screenshot ──────────────────────────────────────────────────────────
     

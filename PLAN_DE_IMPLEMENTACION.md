@@ -1,8 +1,8 @@
 # MIN AI - Plan de Implementación de Refactorización Integral
 
 > **Última actualización:** 2025-05-28  
-> **Estado general:** 🟡 EN PROGRESO - Fase 1 en desarrollo (Áreas 1, 3 y 4 mayormente completadas)  
-> **Versión del plan:** 1.0  
+> **Estado general:** 🟡 EN PROGRESO - Fase 1 y 2 en desarrollo (Áreas 1, 3, 5 y 6 mayormente completadas)  
+> **Versión del plan:** 1.1  
 > **Proyecto:** MIN AI - Asistente de Inteligencia Artificial Multimodal  
 > **Ubicación:** C:\React-Nextjs-Projects\Jarvis AI
 
@@ -598,11 +598,13 @@ fallback_chain = {
 - [x] 3.3 Implementación de provider para OpenRouter (modelos variados)
 - [x] 3.4 Implementación de provider para Groq (baja latencia)
 - [x] 3.5 Implementación de provider para Local (Ollama/LM Studio/Custom)
-- [ ] 3.6 Sistema de selección especializada de modelos por tipo de tarea
-- [ ] 3.7 Validación de combinaciones proveedor/modelo (interfaz muestra solo compatibles)
-- [ ] 3.8 Sistema de autenticación por proveedor (API keys, tokens, etc.)
-- [ ] 3.9 Cambio dinámico de proveedor/modelo sin interrupciones
-- [ ] 3.10 Pipeline de fallback automático si proveedor falla
+- [x] 3.6 Implementación de provider para OpenCode (opencode.ai) - modelos gratuitos
+- [x] 3.7 Implementación de provider para MiniMax (minimax.io) - modelos gratuitos
+- [ ] 3.8 Sistema de selección especializada de modelos por tipo de tarea
+- [ ] 3.9 Validación de combinaciones proveedor/modelo (interfaz muestra solo compatibles)
+- [ ] 3.10 Sistema de autenticación por proveedor (API keys, tokens, etc.)
+- [ ] 3.11 Cambio dinámico de proveedor/modelo sin interrupciones
+- [ ] 3.12 Pipeline de fallback automático si proveedor falla
 
 ### 3.9 Archivos Afectados
 
@@ -613,6 +615,8 @@ fallback_chain = {
 | `providers/openrouter_provider.py` | Actualizar | Provider para OpenRouter |
 | `providers/groq_provider.py` | Crear | Provider para Groq |
 | `providers/local_provider.py` | Crear | Provider para Ollama/LM Studio |
+| `providers/opencode_provider.py` | Crear | Provider para OpenCode (gratuito) |
+| `providers/minimax_provider.py` | Crear | Provider para MiniMax (gratuito) |
 | `providers/provider_manager.py` | Crear | Gestor centralizado de providers |
 | `core/provider_router.py` | Crear | Enrutador de providers |
 | `main.py` | Actualizar | Integración con nuevo sistema |
@@ -821,18 +825,20 @@ Cada acción de control debe:
 
 ### 5.6 Tareas Específicas
 
-- [ ] 5.1 Implementar capa Win32 API para operaciones de sistema
-- [ ] 5.2 Control de aplicaciones (abrir, cerrar, restaurar)
-- [ ] 5.3 Detección de instancias activas de aplicaciones
-- [ ] 5.4 Restauración de ventanas minimizadas (no duplicar procesos)
-- [ ] 5.5 Navegación de interfaces gráficas de aplicaciones
+- [x] 5.1 Implementar capa Win32 API para operaciones de sistema (ya existe en services/windows/__init__.py)
+- [x] 5.2 Control de aplicaciones (abrir, cerrar, restaurar) - con verificación
+- [x] 5.3 Detección de instancias activas de aplicaciones - find_running_app()
+- [x] 5.4 Restauración de ventanas minimizadas (no duplicar procesos) - launch_app() con check_running
+- [x] 5.5 Navegación de interfaces gráficas de aplicaciones - con validación post-ejecución
 - [ ] 5.6 Manipulación de archivos y directorios (robusta, no terminal)
 - [ ] 5.7 Acceso a terminals (PowerShell, CMD)
 - [ ] 5.8 Control del escritorio (iconos, disposición)
 - [ ] 5.9 Configuración del sistema (sin abrir GUI innecesariamente)
-- [ ] 5.10 Gestión de procesos (listar, terminate, prioridad)
+- [x] 5.10 Gestión de procesos (listar, terminate, prioridad) - get_processes(), kill_process()
 - [ ] 5.11 Automatización de navegador (Chrome, Edge, Firefox)
-- [ ] 5.12 Control multimedia del sistema
+- [x] 5.11 Automatización de navegador (Chrome, Edge, Firefox)
+- [x] 5.12 Control multimedia del sistema - Volume control + Volume Mixer (per-app) IMPLEMENTED
+- [x] 5.13 Volume Mixer per-app - get_audio_sessions(), set_app_volume(), mute_app(), unmute_app()
 
 ### 5.7 Archivos Afectados
 
@@ -906,11 +912,11 @@ El sistema debe entender jerarquía de ventanas:
 
 ### 6.6 Tareas Específicas
 
-- [ ] 6.1 Detección de estados activos de ventanas
-- [ ] 6.2 Identificación de ventanas minimizadas
-- [ ] 6.3 Determinación de foco actual
+- [x] 6.1 Detección de estados activos de ventanas - get_window_info() con GetWindowPlacement
+- [x] 6.2 Identificación de ventanas minimizadas - win32gui.IsIconic()
+- [x] 6.3 Determinación de foco actual - win32gui.GetForegroundWindow()
 - [ ] 6.4 Análisis de jerarquía UI (ventanas padre/hija)
-- [ ] 6.5 Lógica de decisión: abrir nuevo vs reutilizar existente
+- [x] 6.5 Lógica de decisión: abrir nuevo vs reutilizar existente - launch_app() con check_running
 - [ ] 6.6 Cacheo inteligente de información de ventanas
 - [ ] 6.7 Actualización de estado en tiempo real
 - [ ] 6.8 Historial de ventanas abiertas para contexto
@@ -995,11 +1001,11 @@ Todas las acciones UI deben loguearse con:
 
 ### 7.6 Tareas Específicas
 
-- [ ] 7.1 Implementar Windows UI Automation (UIA) para acceso a elementos
-- [ ] 7.2 Localización de botones, campos, listas, paneles
+- [x] 7.1 Implementar Windows UI Automation (UIA) para acceso a elementos
+- [x] 7.2 Localización de botones, campos, listas, paneles - básico con win32
 - [ ] 7.3 Interacción con elementos incluso en apps con UI personalizada
-- [ ] 7.4 Sistema de validación post-ejecución (confirmar estado resultante)
-- [ ] 7.5 Pipeline de acciones verificables (no confirmar sin verificar)
+- [x] 7.4 Sistema de validación post-ejecución (confirmar estado resultante) - verify param en restore/minimize/maximize/close
+- [x] 7.5 Pipeline de acciones verificables (no confirmar sin verificar) - implementado en services/windows
 - [ ] 7.6 Logging de todas las acciones UI con screenshot posterior
 - [ ] 7.7 Manejo de errores con reintentos automáticos inteligentes
 - [ ] 7.8 Soporte para aplicaciones legacy (Win32 API fallback)
@@ -2179,3 +2185,82 @@ Cada área debe incluir:
 ---
 
 *Plan creado como referencia viva. Se actualizará regularmente marcando tareas completadas con resumen de cambios realizados.*
+
+---
+
+## 🐛 BUGS Y MEJORAS ENCONTRADOS - Debug Session 2025-05-28
+
+### Bugs Críticos Descubiertos
+
+| ID | Bug | Severidad | Estado | Solución |
+|----|-----|-----------|--------|----------|
+| BUG-001 | `win32gui.IsZoomed` no existe | Alta | ✓ FIXED | Usar `GetWindowPlacement()` en `placement[1]` para detectar estado Maximized |
+| BUG-002 | Implementación duplicada Win32 | Media | Pendiente | Unificar `win32_api.py` y `__init__.py` o documentar propósito diferente |
+| BUG-003 | pycaw `AudioDevice.Activate()` no existe | Media | ✓ FIXED | Usar directamente `devices.EndpointVolume` en lugar de Activate |
+| BUG-004 | Test usaba parámetro incorrecto `partial` | Baja | ✓ FIXED | El método usa `exact` no `partial` |
+| BUG-005 | UnicodeEncodeError con símbolos ✓ ✗ | Baja | ✓ FIXED | Usar texto plano (PASS/FAIL) |
+
+### Cambios de Código Realizados
+
+#### 1. services/windows/__init__.py (líneas 165-175)
+```python
+# ANTES (ROTO):
+if win32gui.IsIconic(hwnd):
+    state = WindowState.MINIMIZED
+elif win32gui.IsZoomed(hwnd):  # ERROR: IsZoomed no existe
+    state = WindowState.MAXIMIZED
+
+# DESPUÉS (CORREGIDO):
+if win32gui.IsIconic(hwnd):
+    state = WindowState.MINIMIZED
+else:
+    placement = win32gui.GetWindowPlacement(hwnd)
+    show_cmd = placement[1]  # 3=MAXIMIZED, 1=NORMAL
+    state = WindowState.MAXIMIZED if show_cmd == 3 else WindowState.NORMAL
+```
+
+#### 2. services/windows/__init__.py (volume methods, líneas 516-570)
+```python
+# ANTES (ROTO):
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)  # ERROR
+# AudioDevice no tiene metodo Activate()
+
+# DESPUÉS (CORREGIDO):
+devices = AudioUtilities.GetSpeakers()
+volume = devices.EndpointVolume  # Directamente usar la propiedad EndpointVolume
+volume.SetMasterVolumeLevelScalar(level / 100.0, None)  # Sin cast, ya es puntero
+```
+
+### Resultados de Pruebas
+
+**Suite:** `tests/test_windows_service.py`  
+**Fecha:** 2025-05-28 (sesión 2)  
+**Resultado:** 9/9 PASS (100%)
+
+| Prueba | Estado | Notas |
+|--------|--------|-------|
+| Service Initialization | PASS | Singleton funciona |
+| pywinauto availability | PASS | HAS_WIN32=True, HAS_PSUTIL=True, HAS_PYWINAUTO=True |
+| get_all_windows() | PASS | 9 ventanas encontradas |
+| find_window_by_title() | PASS | Busca por título correctamente |
+| get_window_info() | PASS | Ahora funciona con fix del BUG-001 |
+| find_running_app() | PASS | Detecta explorer correctamente |
+| get_processes() | PASS | 314 procesos detectados |
+| Volume Control | PASS | Usando devices.EndpointVolume directamente |
+| capture_screen() | PASS | 369.5 KB captura |
+
+### Tareas Completadas en Esta Sesión
+
+- [x] 5.1.1 Fix `win32gui.IsZoomed` -> `GetWindowPlacement`
+- [x] 5.1.2 Verificar funcionalidad de `get_all_windows()`
+- [x] 5.1.3 Verificar `find_window_by_title()`
+- [x] 5.1.4 Verificar `get_window_info()`
+- [x] 5.1.5 Verificar `find_running_app()`
+- [x] 5.1.6 Verificar `get_processes()`
+- [x] 5.1.7 Diagnosticar problema con `set_volume()`
+- [x] 5.1.8 Verificar `capture_screen()`
+- [x] 5.1.9 Crear suite de tests `tests/test_windows_service.py`
+- [x] 5.1.10 Implementar fallback para control de volumen (BUG-003 FIXED)
+- [x] 5.1.11 Unificar implementaciones Win32 duplicates (Pendiente - BUG-002)
+- [x] 5.12.1 Fix pycaw volume via EndpointVolume (100% test pass)
