@@ -21,7 +21,12 @@ def _load_rules() -> list[dict]:
     if not RULES_PATH.exists():
         return []
     try:
-        return json.loads(RULES_PATH.read_text(encoding="utf-8"))
+        data = json.loads(RULES_PATH.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data.get("rules", [])
+        elif isinstance(data, list):
+            return data
+        return []
     except Exception:
         return []
 

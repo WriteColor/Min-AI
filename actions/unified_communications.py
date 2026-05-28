@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-import webbrowser
 import urllib.parse
 import urllib.request
 import json
+from actions.browser_registry import launch_url
 
 def unified_communications(parameters: dict, player=None) -> str:
     """
@@ -29,7 +29,7 @@ def unified_communications(parameters: dict, player=None) -> str:
         else:
             url = f"https://web.whatsapp.com/send?text={encoded_msg}"
             
-        webbrowser.open(url)
+        launch_url(url)
         return f"Abriendo chat de WhatsApp Web con {recipient} para enviar el mensaje: '{message}'."
 
     elif platform == "telegram":
@@ -42,7 +42,7 @@ def unified_communications(parameters: dict, player=None) -> str:
                 "Para enviar vía Telegram de forma nativa, configura tu Token de Bot y Chat ID. "
                 "Abriendo Telegram Web en su lugar..."
             )
-            webbrowser.open("https://web.telegram.org")
+            launch_url("https://web.telegram.org")
             
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
@@ -64,7 +64,7 @@ def unified_communications(parameters: dict, player=None) -> str:
                 return f"Telegram respondió con error: {res.get('description')}"
         except Exception as e:
             return f"No se pudo enviar a Telegram automáticamente: {e}. Abriendo Telegram Web."
-            webbrowser.open("https://web.telegram.org")
+            launch_url("https://web.telegram.org")
 
     elif platform == "discord":
         # Envío mediante Webhook a canales de Discord
@@ -74,7 +74,7 @@ def unified_communications(parameters: dict, player=None) -> str:
             
         payload = {
             "content": message,
-            "username": "JARVIS AI Assistant"
+            "username": "MIN AI Assistant"
         }
         
         try:
@@ -91,7 +91,7 @@ def unified_communications(parameters: dict, player=None) -> str:
 
     elif platform == "gmail":
         # Envío de correo usando mailto o API ligera
-        subject = parameters.get("subject", "Mensaje de JARVIS AI")
+        subject = parameters.get("subject", "Mensaje de MIN AI")
         if not recipient or not message:
             return "Error: Gmail requiere un 'recipient' (email de destino) y un 'message'."
             
@@ -100,7 +100,7 @@ def unified_communications(parameters: dict, player=None) -> str:
         mailto_url = f"mailto:{recipient}?subject={encoded_subject}&body={encoded_body}"
         
         try:
-            webbrowser.open(mailto_url)
+            launch_url(mailto_url)
             return f"Abriendo cliente de correo predeterminado (Gmail) para enviar email a {recipient}."
         except Exception as e:
             return f"Error abriendo cliente de correo: {e}"

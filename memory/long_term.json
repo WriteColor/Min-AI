@@ -1,39 +1,90 @@
 {
   "identity": {
     "name": {
-      "value": "Tupac",
+      "value": "Jeremyah",
       "updated": "2026-05-21"
     },
     "honorific": {
-      "value": "Se\u00f1or",
+      "value": "Ariel",
       "updated": "2026-05-17"
     },
     "name_spelling": {
-      "value": "T\u00fapac (with accent on U)",
+      "value": "Jeremyah",
       "updated": "2026-05-17"
     },
     "city": {
-      "value": "Lima, Peru",
+      "value": "Tegucigalpa, Honduras",
       "updated": "2026-05-17"
     },
     "mood": {
       "value": "festive",
       "updated": "2026-05-17"
+    },
+    "user_name": {
+      "value": "Ariel"
+    },
+    "persona_name": {
+      "value": "MIN"
     }
   },
   "preferences": {
     "address_form": {
       "value": "Se\u00f1or",
       "updated": "2026-05-17"
+    },
+    "favorite_player": {
+      "value": "Messi"
+    },
+    "performance_reason": {
+      "value": "Prefers Google APIs for speed and voice models."
+    },
+    "preferred_calculator_version": {
+      "value": "Modern UI (ms-calculator)"
     }
   },
   "projects": {
     "code_project_status": {
       "value": "User deleted the entire code project.",
       "updated": "2026-05-17"
+    },
+    "current_project_status": {
+      "value": "Latest update made code fully public (uncompiled), but user finds it sluggish despite better previous control/responses. User can revert but prefers current code access."
+    },
+    "future_plans": {
+      "value": "User plans to modify the code, add features, and change the design."
+    },
+    "project_goal": {
+      "value": "Integrate device information/data input."
+    },
+    "export_image_system_improved": {
+      "value": "Improved export system and image display quality."
+    },
+    "neverness_launcher_path": {
+      "value": "C:\\Program Files\\Neverness To Everness\\NTEGlobalLauncher.exe"
+    },
+    "texture_change_context": {
+      "value": "Context regarding marked texture change between exterior and interior for PVC joinery installation."
+    },
+    "wall_detail": {
+      "value": "Detail about the lower part of the wall, which was finished flush ('a pa\u00f1o')."
+    },
+    "window_integration_goal": {
+      "value": "Goal for window installation: integrate and uniformize height between plinth and sill to avoid height difference. User believes it was achieved."
     }
   },
-  "relationships": {},
-  "wishes": {},
-  "notes": {}
+  "relationships": {
+    "juanito_relationship": {
+      "value": "User loves Juanito, who modified MIN's UI."
+    }
+  },
+  "wishes": {
+    "pass_linear_algebra": {
+      "value": "Pass linear algebra class"
+    }
+  },
+  "notes": {
+    "user_frustration": {
+      "value": "User is frustrated with calculator interaction and incorrect execution."
+    }
+  }
 }

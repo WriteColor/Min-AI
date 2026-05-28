@@ -65,12 +65,12 @@ def tool_creator(parameters: dict, player=None, speak=None) -> str:
             # Agregar la nueva herramienta
             main_module.TOOL_DECLARATIONS.append(new_tool_def)
         
-        # 5. Forzar la reconexión de JARVIS para que cargue la nueva herramienta
+        # 5. Forzar la reconexión de MIN para que cargue la nueva herramienta
         if player and hasattr(player, "on_config_saved"):
             from threading import Timer
             def delayed_reload():
                 try:
-                    # Esto forzará que JarvisLive corte la sesión, reconstruya _build_config (con la nueva herramienta) y reconecte.
+                    # Esto forzará que MinLive corte la sesión, reconstruya _build_config (con la nueva herramienta) y reconecte.
                     player.on_config_saved({}) 
                 except:
                     pass

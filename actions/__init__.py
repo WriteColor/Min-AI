@@ -1,1 +1,1 @@
-"""JARVIS Actions package."""
+"""MIN Actions package."""

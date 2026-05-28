@@ -15,6 +15,15 @@ def _get_api_key() -> str:
     except Exception:
         return ""
 
+def _get_default_model() -> str:
+    if not API_FILE.exists():
+        return "google/gemini-2.5-flash"
+    try:
+        data = json.loads(API_FILE.read_text(encoding="utf-8"))
+        return data.get("openrouter_default_model", "google/gemini-2.5-flash")
+    except Exception:
+        return "google/gemini-2.5-flash"
+
 def openrouter_agent(query: str, model: str = "google/gemini-2.5-flash") -> str:
     """
     Delega una tarea de texto compleja a OpenRouter usando el modelo especificado.
@@ -29,16 +38,16 @@ def openrouter_agent(query: str, model: str = "google/gemini-2.5-flash") -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/jarvis-beta",
-        "X-Title": "JARVIS AI Assistant",
+        "HTTP-Referer": "https://github.com/min-beta", #The Repo is not avaible right now, but we can use this as a placeholder for the referer header
+        "X-Title": "MIN AI Assistant",
         "Content-Type": "application/json"
     }
     
     payload = {
-        "model": model,
+        "model": model or _get_default_model(),
         "max_tokens": 1500,
         "messages": [
-            {"role": "system", "content": "Eres un Agente Especialista delegado por JARVIS. Responde de forma clara y directa en español."},
+            {"role": "system", "content": "Eres un Agente Especialista delegado por MIN. Responde de forma clara y directa en español."},
             {"role": "user", "content": query}
         ]
     }

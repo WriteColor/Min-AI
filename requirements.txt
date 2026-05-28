@@ -1,5 +1,6 @@
 sounddevice
 google-genai
+google-generativeai
 pillow
 requests
 beautifulsoup4
@@ -19,8 +20,7 @@ send2trash
 youtube-transcript-api
 pywinauto
 python-pptx
-pyqt6
-pyqt6-webengine
+websockets
 google-auth-oauthlib
 google-api-python-client
 spotipy
@@ -32,4 +32,6 @@ edge-tts
 cryptography
 eventlet
 vosk
-qtawesome
+tzdata
+openai>=1.0.0
+groq>=2.0.0

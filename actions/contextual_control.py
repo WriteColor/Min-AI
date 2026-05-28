@@ -163,7 +163,7 @@ def contextual_control(parameters: dict, player=None) -> str:
             result_msgs.append("Modo Multimedia: Volumen 80%, Brillo 80%, Energía Equilibrado, No Molestar Desactivado.")
 
         # 4. Trabajo de Foco / Programación / Oficina
-        elif any(w in title for w in ["word", "excel", "powerpoint", "vscode", "notepad", "sublime", "pdf", "python", "jarvis"]):
+        elif any(w in title for w in ["word", "excel", "powerpoint", "vscode", "notepad", "sublime", "pdf", "python", "min"]):
             set_master_volume(20)
             set_brightness(50)
             set_power_plan("power_saver")

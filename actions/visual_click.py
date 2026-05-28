@@ -87,8 +87,8 @@ def visual_click(parameters: dict, player=None) -> str:
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "HTTP-Referer": "https://github.com/jarvis-beta",
-            "X-Title": "JARVIS UI Automation",
+            "HTTP-Referer": "https://github.com/min-beta", #The Repo is not avaible right now, but we can use this as a placeholder for the referer header
+            "X-Title": "MIN UI Automation",
             "Content-Type": "application/json"
         }
 

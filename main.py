@@ -1,6 +1,8 @@
 import os
 import json
 import sys
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pywinauto")
 from pathlib import Path
 
 # Load config early to determine GPU acceleration settings
@@ -29,7 +31,7 @@ if _gpu_enabled:
     # Enable hardware acceleration backends for Qt
     os.environ["QSG_RHI_BACKEND"] = "d3d11" # Force Direct3D 11 for hardware rendering on Windows
     os.environ["QSG_INFO"] = "1"
-    print("[JARVIS] GPU Acceleration is ENABLED. Offloading RAM rendering workload to GPU.")
+    print("[MIN] GPU Acceleration is ENABLED. Offloading RAM rendering workload to GPU.")
 else:
     # Balanced low-RAM mode: Keep GPU hardware compositing enabled so glowing CSS effects and drop-shadows are rendered beautifully, but limit renderer processes and JS space size.
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
@@ -42,7 +44,7 @@ else:
         "--disable-sync "
         "--mute-audio"
     )
-    print("[JARVIS] Using Balanced Low RAM GPU-Composited mode for beautiful fluid rendering.")
+    print("[MIN] Using Balanced Low RAM GPU-Composited mode for beautiful fluid rendering.")
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -55,17 +57,17 @@ try:
     import pygetwindow as gw
 except ImportError:
     gw = None
-from PyQt6.QtCore import QMetaObject, Qt
+# PyQt6 removed — UI is now exclusively Tauri + WebSocket
 
 import traceback
 from pathlib import Path
 
 # ── Dedicated thread pool for tool execution — prevents starvation ────────────
-_TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="jarvis-tool")
+_TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="min-tool")
 
 try:
     from zoneinfo import ZoneInfo as _ZoneInfo
-    _BA_TZ = _ZoneInfo("America/Lima")
+    _BA_TZ = _ZoneInfo("America/Tegucigalpa")  # Default timezone (Central America)
 except Exception:
     from datetime import timezone as _tz, timedelta as _td
     _BA_TZ = _tz(_td(hours=-5))
@@ -77,6 +79,11 @@ def _load_tz():
     try:
         cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
         tz_name = cfg.get("timezone", "")
+        if not tz_name:
+            from datetime import datetime as _dt
+            _BA_TZ = _dt.now().astimezone().tzinfo
+            print(f"[TZ] Using system timezone: {_BA_TZ}")
+            return
         if tz_name:
             try:
                 _BA_TZ = _ZoneInfo(tz_name)
@@ -113,7 +120,7 @@ import numpy as np
 import sounddevice as sd
 from google import genai
 from google.genai import types
-from ui import JarvisUI
+from ui import MinUI
 
 def _patch_settings_ui():
     pass
@@ -136,6 +143,11 @@ try:
     from actions.open_app          import open_app
 except ImportError:
     open_app = None
+
+try:
+    from actions.media_control     import media_control
+except ImportError:
+    media_control = None
 try:
     from actions.weather_report    import weather_action
 except ImportError:
@@ -340,7 +352,7 @@ def get_base_dir():
 BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
-LOG_PATH        = BASE_DIR / "jarvis.log"
+LOG_PATH        = BASE_DIR / "Min.log"
 
 # ── Redirect output to log file (pythonw.exe has no console) ─
 try:
@@ -380,9 +392,9 @@ if sys.platform == "win32":
                     kwargs["creationflags"] = kwargs.get("creationflags", 0) | _CREATE_NO_WINDOW
                     super().__init__(*args, **kwargs)
             _sp.Popen = _NoCmdPopen
-            print("[JARVIS] subprocess.Popen patched: CREATE_NO_WINDOW active")
+            print("[MIN] subprocess.Popen patched: CREATE_NO_WINDOW active")
     except Exception as _e:
-        print(f"[JARVIS] Could not patch subprocess: {_e}")
+        print(f"[MIN] Could not patch subprocess: {_e}")
 
 LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
@@ -402,21 +414,36 @@ def _get_api_key() -> str:
     return _cached_api_key
 
 
-JARVIS_VOICES = {
+def _get_live_model() -> str:
+    try:
+        cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
+        return cfg.get("live_model") or LIVE_MODEL
+    except Exception:
+        return LIVE_MODEL
+
+
+MIN_VOICES = {
     "Aoede":  ("Femenina", "Cálida y sofisticada — ideal para asistente IA"),
     "Kore":   ("Femenina", "Suave y precisa"),
     "Leda":   ("Femenina", "Natural y fluida"),
     "Zephyr": ("Femenina", "Dinámica y expresiva"),
-    "Charon": ("Masculina", "Profunda y seria — voz original de JARVIS"),
+    "Charon": ("Masculina", "Profunda y seria — voz original de MIN"),
     "Puck":   ("Masculina", "Ágil y versátil"),
     "Fenrir": ("Masculina", "Grave y autoritaria"),
     "Orus":   ("Masculina", "Clásica y equilibrada"),
 }
 
-def _get_jarvis_voice() -> str:
+def _get_llm_provider() -> str:
     try:
         cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
-        return cfg.get("jarvis_voice", "Aoede")
+        return cfg.get("llm_provider", "gemini")
+    except Exception:
+        return "gemini"
+
+def _get_min_voice() -> str:
+    try:
+        cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
+        return cfg.get("min_voice", "Aoede")
     except Exception:
         return "Aoede"
 
@@ -426,7 +453,7 @@ def _load_system_prompt() -> str:
         return PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         return (
-            "You are JARVIS, Tony Stark's AI assistant. "
+            "You are MIN, Tony Stark's AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool."
         )
@@ -438,11 +465,29 @@ def _clean_transcript(text: str) -> str:
     text = re.sub(r"[\x00-\x08\x0b-\x1f]", "", text)
     return text.strip()
 
+def strip_markdown(text: str) -> str:
+    """Removes standard markdown characters so that TTS doesn't read them aloud."""
+    # Remove bold/italic markers
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"\*([^*]+)\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    text = re.sub(r"_([^_]+)_", r"\1", text)
+    # Remove code blocks
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    # Remove inline code
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # Remove headers
+    text = re.sub(r"#+\s+", "", text)
+    # Remove links
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    return text.strip()
+
+
 TOOL_DECLARATIONS = [
     {
-        "name": "jarvis_ui_control",
+        "name": "min_ui_control",
         "description": (
-            "Control total sobre la ventana principal y los widgets de la interfaz de JARVIS. "
+            "Control total sobre la ventana principal y los widgets de la interfaz de MIN. "
             "Permite minimizar/restaurar la ventana principal, o abrir, cerrar, alternar la visibilidad de cualquier widget del dashboard.\n"
             "Widgets disponibles: weather (clima), spotify (música), system (sistema), "
             "notes (notas), todo (tareas), maps (mapas), image (imágenes), camera (cámara)."
@@ -496,13 +541,13 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "weather_report",
-        "description": "Gives the weather report to user",
+        "description": "Gives the weather report. Uses config/geolocation if city is omitted.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
                 "city": {"type": "STRING", "description": "City name"}
             },
-            "required": ["city"]
+            "required": []
         }
     },
     {
@@ -643,7 +688,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "sleep_mode",
-        "description": "Entra en modo suspensión. Desactiva el micrófono para la IA hasta que el usuario diga 'Oye JARVIS' o 'JARVIS' localmente.",
+        "description": "Entra en modo suspensión. Desactiva el micrófono para la IA hasta que el usuario diga 'Oye MIN' o 'MIN' localmente.",
         "parameters": {
             "type": "OBJECT",
             "properties": {}
@@ -810,11 +855,11 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "shutdown_jarvis",
+        "name": "shutdown_min",
         "description": (
             "Shuts down the assistant completely. "
             "Call this when the user expresses intent to end the conversation, "
-            "close the assistant, say goodbye, or stop Jarvis. "
+            "close the assistant, say goodbye, or stop Min. "
             "The user can say this in ANY language."
         ),
         "parameters": {
@@ -934,6 +979,23 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "media_control",
+        "description": (
+            "Control multimedia del sistema (teclas de media): play/pause, siguiente, anterior, volumen. "
+            "Usar cuando el usuario pida controlar musica o reproduccion general sin mencionar Spotify."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "play | pause | play_pause | toggle | next | previous | prev | stop | volume_up | volume_down | mute"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
         "name": "rgb_control",
         "description": (
             "Controla las luces RGB de periféricos y componentes de la PC (teclado, mouse, GPU, RAM, etc.). "
@@ -1025,7 +1087,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Muestra rutas de navegación y mapas interactivos. "
             "Usar para: cómo llegar a un lugar, cuánto tarda, indicaciones paso a paso, "
-            "buscar una dirección en el mapa. Abre mapa JARVIS en Chrome con la ruta marcada. "
+            "buscar una dirección en el mapa. Abre mapa MIN en el browser con la ruta marcada. "
             "SIEMPRE llamar para cualquier pedido de navegación, rutas o mapas."
         ),
         "parameters": {
@@ -1088,7 +1150,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Perfil dinámico del usuario — hábitos, preferencias, historial de uso. "
             "Ver perfil, configurar preferencias, ver hábitos aprendidos, guardar notas personales. "
-            "JARVIS aprende automáticamente los patrones del usuario."
+            "MIN aprende automáticamente los patrones del usuario."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -1188,7 +1250,7 @@ TOOL_DECLARATIONS = [
                 "title":    {"type": "STRING", "description": "Título de la entrada"},
                 "content":  {"type": "STRING", "description": "Contenido o texto a guardar"},
                 "type":     {"type": "STRING", "description": "note | idea | snippet | reference | fact | task | question"},
-                "tags":     {"type": "STRING", "description": "Tags separados por coma (ej: python, jarvis, idea)"},
+                "tags":     {"type": "STRING", "description": "Tags separados por coma (ej: python, min, idea)"},
                 "query":    {"type": "STRING", "description": "Búsqueda en la base de conocimiento"},
                 "entry_id": {"type": "STRING", "description": "ID de la entrada para get/update/delete"},
                 "path":     {"type": "STRING", "description": "Ruta para exportar (action=export)"},
@@ -1346,7 +1408,7 @@ TOOL_DECLARATIONS = [
             "Usa Pollinations.ai (gratis, open-source, sin API key) o Gemini. "
             "SIEMPRE llamar cuando el usuario pide 'generame una imagen', 'crea una foto de', "
             "'dibujame', 'haceme una imagen', 'quiero una foto de', o 'mostrame', etc. "
-            "Después de generar, la imagen se muestra automáticamente en el widget de JARVIS."
+            "Después de generar, la imagen se muestra automáticamente en el widget de MIN."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -1354,7 +1416,7 @@ TOOL_DECLARATIONS = [
                 "prompt":       {"type": "STRING",  "description": "Descripción detallada de la imagen a generar"},
                 "count":        {"type": "INTEGER", "description": "Cantidad de imágenes (1-4, default: 1)"},
                 "aspect_ratio": {"type": "STRING",  "description": "Relación de aspecto: 1:1 | 4:3 | 3:4 | 16:9 | 9:16 (default: 1:1)"},
-                "save_path":    {"type": "STRING",  "description": "Carpeta de guardado (default: ~/Pictures/JARVIS_Generadas)"},
+                "save_path":    {"type": "STRING",  "description": "Carpeta de guardado (default: ~/Pictures/MIN_Generadas)"},
             },
             "required": ["prompt"]
         }
@@ -1551,7 +1613,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "screen_vision",
         "description": (
-            "JARVIS puede VER la pantalla del usuario. Captura lo que está en el monitor "
+            "MIN puede VER la pantalla del usuario. Captura lo que está en el monitor "
             "y usa IA (Gemini Vision) para describirlo, responder preguntas, leer texto, "
             "o dar ayuda contextual basada en lo que se está mostrando.\n"
             "SIEMPRE usar cuando el usuario diga: '¿qué estoy viendo?', '¿qué hay en mi pantalla?', "
@@ -1581,10 +1643,10 @@ TOOL_DECLARATIONS = [
     {
         "name": "morning_brief",
         "description": (
-            "Genera el informe matutino inteligente de JARVIS. "
+            "Genera el informe matutino inteligente de MIN. "
             "Incluye saludo personalizado, hora, fecha, clima actual, objetivos activos y consejo del día. "
             "Usar cuando el usuario pida: 'informe del día', 'brief matutino', 'qué hay hoy', "
-            "'resumen del día', 'buenos días JARVIS', o al iniciar el día."
+            "'resumen del día', 'buenos días MIN', o al iniciar el día."
         ),
         "parameters": {
             "type": "object",
@@ -1600,7 +1662,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "vision_guardian",
         "description": (
-            "Controla el Guardian de Visión Ambiental de JARVIS — monitoreo proactivo de pantalla. "
+            "Controla el Guardian de Visión Ambiental de MIN — monitoreo proactivo de pantalla. "
             "Analiza la pantalla periódicamente con IA y ofrece ayuda contextual cuando detecta algo relevante. "
             "Usar cuando el usuario diga: 'activa el guardian', 'desactiva el guardian', "
             "'vigila mi pantalla', 'deja de vigilar', 'analiza mi pantalla ahora', "
@@ -1625,7 +1687,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "accessibility_overlay",
         "description": (
-            "Muestra, oculta o alterna la barra flotante de accesibilidad JARVIS sobre el escritorio. "
+            "Muestra, oculta o alterna la barra flotante de accesibilidad MIN sobre el escritorio. "
             "USAR cuando el usuario diga: 'mostrar barra de accesibilidad', 'abrir panel de accesibilidad', "
             "'activar barra para ciegos', 'cerrar barra', 'ocultar barra de accesibilidad', "
             "'alternar barra', 'barra de accesibilidad'."
@@ -1728,7 +1790,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "tool_creator",
         "description": (
-            "Permite a JARVIS programar e instalar sus propias herramientas. "
+            "Permite a MIN programar e instalar sus propias herramientas. "
             "ÚSALO SIEMPRE que el usuario te pida que aprendas a hacer algo nuevo, o si necesitas una funcionalidad que no tienes preinstalada. "
             "Escribirás el código Python y se instalará automáticamente."
         ),
@@ -1882,7 +1944,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "auto_programmer",
         "description": (
-            "Suite de desarrollo y auto-programación autónoma avanzada. Permite a JARVIS escribir "
+            "Suite de desarrollo y auto-programación autónoma avanzada. Permite a MIN escribir "
             "código Python para nuevas herramientas, validar sintaxis con py_compile, correr tests sintácticos "
             "en un sandbox con traceback detallado, corregir errores e inyectar plugins en caliente."
         ),
@@ -1920,11 +1982,11 @@ TOOL_DECLARATIONS = [
     {
         "name": "self_edit",
         "description": (
-            "Auto-edición de código: JARVIS puede leer, modificar, crear y gestionar sus propios archivos de código fuente. "
+            "Auto-edición de código: MIN puede leer, modificar, crear y gestionar sus propios archivos de código fuente. "
             "Crea backups automáticos antes de cada cambio. "
             "USAR cuando el usuario pida: 'editá tu código', 'cambiá tu prompt', 'agregá esta función', "
             "'modificá tu comportamiento', 'mejorate', 'aprendé a hacer X editando tu código', "
-            "o cuando JARVIS necesite auto-mejorarse, corregir bugs propios o agregar capacidades. "
+            "o cuando MIN necesite auto-mejorarse, corregir bugs propios o agregar capacidades. "
             "Puede editar: main.py, core/prompt.txt, actions/*.py, config/*, o cualquier archivo del proyecto."
         ),
         "parameters": {
@@ -1984,9 +2046,9 @@ try:
 except Exception as _e:
     pass
 
-class JarvisLive:
+class MinLive:
 
-    def __init__(self, ui: JarvisUI):
+    def __init__(self, ui: MinUI):
         self.ui             = ui
         self.session        = None
         self.is_sleeping    = False
@@ -1996,13 +2058,15 @@ class JarvisLive:
             if os.path.exists("config/vosk_model"):
                 model = vosk.Model("config/vosk_model")
                 self.vosk_recognizer = vosk.KaldiRecognizer(model, 16000)
-                print("[JARVIS] Modelo Vosk cargado para Modo Suspensión.")
+                print("[MIN] Modelo Vosk cargado para Modo Suspensión.")
         except Exception as e:
-            print(f"[JARVIS] No se pudo cargar Vosk: {e}")
+            print(f"[MIN] No se pudo cargar Vosk: {e}")
         self.audio_in_queue = None
-        # Iniciar scheduler y motor de reglas en background al arrancar JARVIS
-        start_runner(player=ui, speak=None)
-        start_rules_runner(player=ui, speak=None)
+        # Iniciar scheduler y motor de reglas en background al arrancar MIN
+        if callable(start_runner):
+            start_runner(player=ui, speak=None)
+        if callable(start_rules_runner):
+            start_rules_runner(player=ui, speak=None)
         self.out_queue      = None
         self._loop          = None
         self._is_speaking   = False
@@ -2031,8 +2095,16 @@ class JarvisLive:
         """Called from UI thread when user saves settings. Triggers session reconnect."""
         global _cached_api_key
         _cached_api_key = None  # Invalidate cached key so new one is loaded on reconnect
-        print("[JARVIS] ⚙️ Config actualizada — reconectando sesión...")
+        print("[MIN] ⚙️ Config actualizada — reconectando sesión...")
         self.ui.write_log("SYS: Aplicando nueva configuración...")
+        
+        # Reload vision guardian settings dynamically if it's active
+        try:
+            from actions.vision_guardian import reload_state as reload_vision_guardian_state
+            reload_vision_guardian_state()
+        except Exception as e:
+            print(f"[MIN] Error al recargar Vision Guardian: {e}")
+
         if self._reconnect_event and self._loop:
             self._loop.call_soon_threadsafe(self._reconnect_event.set)
 
@@ -2042,8 +2114,191 @@ class JarvisLive:
             await self._reconnect_event.wait()
             raise RuntimeError("Config changed — reconnect requested")
 
+    async def _stability_monitor(self):
+        """Monitorea periódicamente el consumo de RAM y ejecuta GC. Si supera el umbral, reinicia."""
+        import gc
+        import psutil
+        import os
+        import sys
+        import json
+        import subprocess
+
+        while True:
+            await asyncio.sleep(300)  # Cada 5 minutos
+            gc.collect()
+            try:
+                max_mem = 500.0
+                cfg_path = Path(__file__).parent / "config" / "api_keys.json"
+                if cfg_path.exists():
+                    try:
+                        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                        max_mem = float(cfg.get("max_memory_mb", 500.0))
+                    except Exception:
+                        pass
+
+                proc = psutil.Process(os.getpid())
+                mem_mb = proc.memory_info().rss / 1024 / 1024
+                if mem_mb > max_mem:
+                    print(f"[MIN] ⚠️ Uso de memoria ({mem_mb:.1f} MB) excedió el límite ({max_mem:.1f} MB). Reiniciando preventivamente...")
+                    self.ui.write_log(f"SYS: Uso de memoria elevado ({mem_mb:.1f} MB). Reiniciando preventivamente...")
+                    
+                    # Lanzar nueva instancia detached y apagar este proceso
+                    main_py = str(Path(__file__).parent / "main.py")
+                    subprocess.Popen([sys.executable, main_py], creationflags=0x00000008)  # DETACHED_PROCESS
+                    os._exit(0)
+            except Exception as e:
+                print(f"[MIN] Error en monitor de estabilidad: {e}")
+
+    async def _speak_local(self, text: str):
+        """Genera voz para el texto usando edge-tts y la reproduce usando WMPlayer de Windows."""
+        import edge_tts
+        import tempfile
+        import win32com.client
+        import time
+        import os
+        
+        cleaned_text = strip_markdown(text)
+        if not cleaned_text:
+            return
+            
+        # Get configured voice
+        voice_name = _get_min_voice()
+        # Map our 8 voices to edge-tts voices
+        voice_map = {
+            "Aoede":  "es-MX-DaliaNeural",
+            "Kore":   "es-ES-ElviraNeural",
+            "Leda":   "es-US-PalomaNeural",
+            "Zephyr": "es-MX-LarissaNeural",
+            "Charon": "es-ES-AlvaroNeural",
+            "Puck":   "es-MX-JorgeNeural",
+            "Fenrir": "es-US-AlonsoNeural",
+            "Orus":   "es-ES-ArnauNeural",
+        }
+        edge_voice = voice_map.get(voice_name, "es-MX-DaliaNeural")
+        
+        self.set_speaking(True)
+        
+        try:
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, f"min_local_tts_{int(time.time())}.mp3")
+            
+            communicate = edge_tts.Communicate(cleaned_text, edge_voice)
+            await communicate.save(temp_path)
+            
+            # Play using Windows WMPlayer OCX
+            def _play_and_wait():
+                try:
+                    player = win32com.client.Dispatch("WMPlayer.OCX")
+                    media = player.newMedia(temp_path)
+                    player.currentPlaylist.appendItem(media)
+                    player.controls.play()
+                    
+                    time.sleep(0.3)
+                    while player.playState in (2, 3, 6, 9):
+                        time.sleep(0.1)
+                except Exception as pe:
+                    print(f"[MIN] local play error: {pe}")
+                finally:
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                        
+            await asyncio.to_thread(_play_and_wait)
+        except Exception as e:
+            print(f"[MIN] TTS local error: {e}")
+            
+        self.set_speaking(False)
+
+    async def _local_openai_consumer(self):
+        """Consume comandos typed/transcribed locally, query Local OpenAI LLM and speak output."""
+        import json
+        import urllib.request
+        import urllib.error
+        
+        while True:
+            text = await self._local_command_queue.get()
+            if not text:
+                continue
+
+            self.ui.set_state("THINKING")
+            
+            base_url = "http://127.0.0.1:1337/v1"
+            model = "mistral-7b-instruct"
+            api_key = "not-needed"
+            reasoning = False
+            
+            try:
+                cfg_path = Path(__file__).parent / "config" / "api_keys.json"
+                if cfg_path.exists():
+                    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                    base_url = cfg.get("local_openai_base_url", "http://127.0.0.1:1337/v1").strip()
+                    model = cfg.get("local_openai_model", "mistral-7b-instruct").strip()
+                    api_key = cfg.get("local_openai_api_key", "not-needed").strip()
+                    reasoning = bool(cfg.get("local_openai_reasoning", False))
+            except Exception:
+                pass
+                
+            url = base_url
+            if not url.endswith("/chat/completions"):
+                url = url.rstrip("/") + "/chat/completions"
+                
+            headers = {
+                "Content-Type": "application/json"
+            }
+            if api_key and api_key != "not-needed":
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            sys_prompt = _load_system_prompt()
+            if reasoning:
+                sys_prompt += "\nPor favor, piensa paso a paso de forma lógica y razonada antes de responder."
+
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": text}
+                ],
+                "temperature": 0.7
+            }
+            
+            self.ui.clear_min_response()
+            self.ui.stream_min_chunk("Pensando (Modelo Local)...")
+            
+            loop = asyncio.get_event_loop()
+            try:
+                def _make_call():
+                    req = urllib.request.Request(
+                        url, 
+                        data=json.dumps(payload).encode("utf-8"), 
+                        headers=headers, 
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as response:
+                        return json.loads(response.read().decode("utf-8"))
+                        
+                response_data = await loop.run_in_executor(None, _make_call)
+                
+                if "choices" in response_data and len(response_data["choices"]) > 0:
+                    resp_text = response_data["choices"][0]["message"]["content"]
+                    
+                    self.ui.clear_min_response()
+                    self.ui.stream_min_chunk(resp_text)
+                    
+                    # Speak response using local edge-tts
+                    await self._speak_local(resp_text)
+                else:
+                    self.ui.clear_min_response()
+                    self.ui.stream_min_chunk("Error: Recibí una respuesta vacía del LLM local.")
+            except Exception as e:
+                self.ui.clear_min_response()
+                self.ui.stream_min_chunk(f"Error de conexión local: {e}")
+                print(f"[MIN] Local LLM error: {e}")
+                
+            self.ui.set_state("LISTENING")
+
     def _on_text_command(self, text: str):
-        if not self._loop or not self.session:
+        if not self._loop:
             return
 
         # Audio file: process with Gemini Vision (not the realtime audio session)
@@ -2055,16 +2310,24 @@ class JarvisLive:
                 )
             return
 
-        # Check phrase triggers — if one fires, don't also send to Gemini
+        # Check phrase triggers — if one fires, don't also send to LLM
         if self._fire_phrase_triggers(text):
             return
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"parts": [{"text": text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
+
+        provider = _get_llm_provider()
+        if provider == "local_openai":
+            self.ui.write_log(f"Tú (Local): {text}")
+            self._loop.call_soon_threadsafe(self._local_command_queue.put_nowait, text)
+        else:
+            if not self.session:
+                return
+            asyncio.run_coroutine_threadsafe(
+                self.session.send_client_content(
+                    turns={"parts": [{"text": text}]},
+                    turn_complete=True
+                ),
+                self._loop
+            )
 
     async def _process_audio_file(self, path: str):
         """Transcribe and analyze an audio file via Gemini (separate from realtime session)."""
@@ -2110,9 +2373,9 @@ class JarvisLive:
                 return resp.text.strip()
 
             result = await loop.run_in_executor(_TOOL_EXECUTOR, _analyze)
-            self.ui.write_log(f"JARVIS: {result}")
+            self.ui.write_log(f"MIN: {result}")
 
-            # Feed result back into the realtime session so JARVIS can speak it
+            # Feed result back into the realtime session so MIN can speak it
             if self.session:
                 await self.session.send_client_content(
                     turns={"parts": [{"text": f"[RESULTADO AUDIO '{p.name}']\n{result}"}]},
@@ -2136,37 +2399,37 @@ class JarvisLive:
         # ── Accessibility quick triggers ──────────────────────────────────────
         if any(p in text_lower for p in ["activar seguimiento ocular", "iniciar eye tracking",
                                           "activar control ocular", "encender seguimiento de ojos"]):
-            if eye_tracking:
+            if eye_tracking is not None:
                 result = eye_tracking({"action": "start"})
+                self.ui.write_log("⚡ " + result)
             else:
-                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-            self.ui.write_log("⚡ " + result)
+                self.ui.write_log("[Phrase] Module not available")
             return True
 
         if any(p in text_lower for p in ["detener seguimiento ocular", "apagar eye tracking",
                                           "desactivar control ocular"]):
-            if eye_tracking:
+            if eye_tracking is not None:
                 result = eye_tracking({"action": "stop"})
+                self.ui.write_log("⚡ " + result)
             else:
-                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-            self.ui.write_log("⚡ " + result)
+                self.ui.write_log("[Phrase] Module not available")
             return True
 
         if any(p in text_lower for p in ["activar detector de movimientos", "iniciar movimiento",
                                           "activar micromovimientos", "encender control por cabeza"]):
-            if micro_movement:
+            if micro_movement is not None:
                 result = micro_movement({"action": "start"})
+                self.ui.write_log("⚡ " + result)
             else:
-                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-            self.ui.write_log("⚡ " + result)
+                self.ui.write_log("[Phrase] Module not available")
             return True
 
         if any(p in text_lower for p in ["detener detector de movimientos", "apagar micromovimientos"]):
-            if micro_movement:
+            if micro_movement is not None:
                 result = micro_movement({"action": "stop"})
+                self.ui.write_log("⚡ " + result)
             else:
-                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-            self.ui.write_log("⚡ " + result)
+                self.ui.write_log("[Phrase] Module not available")
             return True
 
         if any(p in text_lower for p in ["simplifica", "simplificar", "dividir en pasos"]):
@@ -2174,11 +2437,11 @@ class JarvisLive:
                 if phrase in text_lower:
                     task_text = user_text[len(phrase):].strip()
                     if task_text:
-                        if task_simplify:
+                        if task_simplify is not None:
                             result = task_simplify(task_text)
+                            self.ui.write_log("⚡ [Simplificado]\n" + result[:300])
                         else:
-                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-                        self.ui.write_log("⚡ [Simplificado]\n" + result[:300])
+                            self.ui.write_log("[Phrase] Module not available")
                         return True
 
         if "agregar rutina" in text_lower or "nueva rutina" in text_lower:
@@ -2186,11 +2449,11 @@ class JarvisLive:
                 if phrase in text_lower:
                     routine_name = user_text[len(phrase):].strip()
                     if routine_name:
-                        if routine_gamify:
+                        if routine_gamify is not None:
                             result = routine_gamify({"action": "add", "name": routine_name})
+                            self.ui.write_log("⚡ " + result)
                         else:
-                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-                        self.ui.write_log("⚡ " + result)
+                            self.ui.write_log("[Phrase] Module not available")
                         return True
 
         if "completar rutina" in text_lower or "terminar rutina" in text_lower:
@@ -2198,19 +2461,19 @@ class JarvisLive:
                 if phrase in text_lower:
                     routine_name = user_text[len(phrase):].strip()
                     if routine_name:
-                        if routine_gamify:
+                        if routine_gamify is not None:
                             result = routine_gamify({"action": "complete", "name": routine_name})
+                            self.ui.write_log("⚡ " + result)
                         else:
-                            self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-                        self.ui.write_log("⚡ " + result)
+                            self.ui.write_log("[Phrase] Module not available")
                         return True
 
         if "mis rutinas" in text_lower or "ver rutinas" in text_lower or "listar rutinas" in text_lower:
-            if routine_gamify:
+            if routine_gamify is not None:
                 result = routine_gamify({"action": "list"})
+                self.ui.write_log("⚡ [Rutinas]\n" + result)
             else:
-                self.ui.write_log("⚠️ Módulo de accesibilidad no disponible.")
-            self.ui.write_log("⚡ [Rutinas]\n" + result)
+                self.ui.write_log("[Phrase] Module not available")
             return True
 
         # ── User-defined phrase automations ───────────────────────────────────
@@ -2226,13 +2489,16 @@ class JarvisLive:
                     ).start()
                 return True  # phrase fired → don't also send to Gemini
         except Exception as e:
-            print(f"[JARVIS] phrase trigger error: {e}")
+            print(f"[MIN] phrase trigger error: {e}")
 
         return False
 
     def set_speaking(self, value: bool):
+        import time
         with self._speaking_lock:
             self._is_speaking = value
+            if not value:
+                self._last_speak_time = time.time()
         if value:
             self.ui.set_state("SPEAKING")
         elif not self.ui.muted:
@@ -2241,9 +2507,10 @@ class JarvisLive:
     def speak(self, text: str):
         if not self._loop or not self.session:
             return
+        cleaned = strip_markdown(text)
         asyncio.run_coroutine_threadsafe(
             self.session.send_client_content(
-                turns={"parts": [{"text": text}]},
+                turns={"parts": [{"text": cleaned}]},
                 turn_complete=True
             ),
             self._loop
@@ -2301,7 +2568,7 @@ class JarvisLive:
         parts.append(sys_prompt)
 
         # Build SpeechConfig — try to set speaking rate for faster delivery
-        _voice_name = _get_jarvis_voice()
+        _voice_name = _get_min_voice()
         _speech_cfg = None
         try:
             _speech_cfg = types.SpeechConfig(
@@ -2353,7 +2620,7 @@ class JarvisLive:
                 )
             )
             _vad_applied = True
-            print("[JARVIS] VAD config aplicado (typed)")
+            print("[MIN] VAD config aplicado (typed)")
         except Exception:
             pass
 
@@ -2367,9 +2634,9 @@ class JarvisLive:
                         "silence_duration_ms": 500,
                     }
                 }
-                print("[JARVIS] VAD config aplicado (dict)")
+                print("[MIN] VAD config aplicado (dict)")
             except Exception:
-                print("[JARVIS] VAD config no aplicado")
+                print("[MIN] VAD config no aplicado")
 
         # ── Context compression: prevent session degradation over time ────────
         try:
@@ -2393,18 +2660,24 @@ class JarvisLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        print(f"[JARVIS] 🔧 {name}  {args}")
+        print(f"[MIN] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
 
 
 
-        if name == "shutdown_jarvis":
-            self.ui.write_log("SYS: Apagando JARVIS...")
-            # Must quit from Qt main thread — signals are thread-safe
-            self.ui._win._shutdown_sig.emit()
+        if name == "shutdown_min":
+            self.ui.write_log("SYS: Apagando MIN...")
+            try:
+                self.ui.broadcast({"type": "ui_control", "action": "shutdown"})
+                await asyncio.sleep(0.5)
+            except Exception:
+                pass
+            self.running = False
+            print("[MIN] Shutdown signal sent.")
+            sys.exit(0)
             return types.FunctionResponse(
                 id=fc.id, name=name,
-                response={"result": "Apagando JARVIS. ¡Hasta luego, señor!"}
+                response={"result": "Apagando MIN. ¡Hasta luego, señor!"}
             )
 
         if name == "save_memory":
@@ -2433,7 +2706,7 @@ class JarvisLive:
                 self.is_sleeping = True
                 self.ui.write_log("SYS: 💤 Entrando en suspensión local.")
                 self.ui.set_state("MUTED")
-                result = "Entrando en suspensión absoluta. Cortando transmisión a la nube hasta escuchar 'JARVIS'."
+                result = "Entrando en suspensión absoluta. Cortando transmisión a la nube hasta escuchar 'MIN'."
 
             elif name == "weather_report":
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: weather_action(parameters=args, player=self.ui))
@@ -2584,6 +2857,13 @@ class JarvisLive:
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: spotify_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
+            elif name == "media_control":
+                if media_control:
+                    r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: media_control(parameters=args, player=self.ui))
+                    result = r or "Done."
+                else:
+                    result = "Modulo media_control no encontrado."
+
             elif name == "rgb_control":
                 r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: rgb_control(parameters=args, player=self.ui))
                 result = r or "Done."
@@ -2717,57 +2997,29 @@ class JarvisLive:
                 else:
                     result = "Módulo native_ui no encontrado."
 
-            elif name == "jarvis_ui_control":
+            elif name == "min_ui_control":
                 action_ui = args.get("action", "").lower()
                 widget_name = args.get("widget", "").lower()
                 if action_ui == "minimize":
-                    try:
-                        if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showMinimized"):
-                            QMetaObject.invokeMethod(self.ui._win, "showMinimized", Qt.ConnectionType.QueuedConnection)
-                        elif hasattr(self.ui, "root") and hasattr(self.ui.root, "iconify"):
-                            self.ui.root.after(0, self.ui.root.iconify)
-                        result = "Interfaz de usuario minimizada."
-                    except Exception as ui_e:
-                        result = f"Error al minimizar: {ui_e}"
+                    self.ui.broadcast({"type": "ui_control", "action": "minimize"})
+                    result = "Interfaz de usuario minimizada."
                 elif action_ui == "restore":
-                    try:
-                        if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                            QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
-                            QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
-                        elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
-                            def _restore():
-                                self.ui.root.deiconify()
-                                self.ui.root.attributes("-topmost", True)
-                                self.ui.root.attributes("-topmost", False)
-                            self.ui.root.after(0, _restore)
-                        result = "Interfaz de usuario restaurada."
-                    except Exception as ui_e:
-                        result = f"Error al restaurar: {ui_e}"
+                    self.ui.broadcast({"type": "ui_control", "action": "restore"})
+                    result = "Interfaz de usuario restaurada."
                 elif action_ui == "hide_all":
-                    self.ui.write_log("__hide__")
+                    self.ui.broadcast({"type": "ui_control", "action": "hide_all"})
                     result = "Todos los widgets ocultados."
                 elif action_ui in ("show", "hide", "toggle"):
                     if widget_name == "main_window" or not widget_name:
                         if action_ui == "show":
-                            try:
-                                if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                                    QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
-                                    QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
-                                elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
-                                    def _restore():
-                                        self.ui.root.deiconify()
-                                        self.ui.root.attributes("-topmost", True)
-                                        self.ui.root.attributes("-topmost", False)
-                                    self.ui.root.after(0, _restore)
-                                result = "Interfaz de usuario restaurada."
-                            except Exception as ui_e:
-                                result = f"Error al restaurar: {ui_e}"
+                            self.ui.broadcast({"type": "ui_control", "action": "restore"})
+                            result = "Interfaz de usuario restaurada."
                         else:
-                            self.ui.write_log("__hide__")
+                            self.ui.broadcast({"type": "ui_control", "action": "hide_all"})
                             result = "Todos los widgets ocultados."
                     else:
                         cmd = "__widget_show__" if action_ui in ("show", "toggle") else "__widget_close__"
-                        self.ui.write_log(f"{cmd}:{widget_name}")
+                        self.ui.broadcast({"type": "ui_control", "action": cmd, "widget": widget_name})
                         result = f"Widget '{widget_name}' {'mostrado' if 'show' in cmd else 'ocultado'}."
                 else:
                     result = f"Acción de UI desconocida: {action_ui}"
@@ -2799,7 +3051,7 @@ class JarvisLive:
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
+        print(f"[MIN] 📤 {name} → {str(result)[:80]}")
         return types.FunctionResponse(
             id=fc.id, name=name,
             response={"result": result}
@@ -2811,17 +3063,26 @@ class JarvisLive:
             await self.session.send_realtime_input(media=msg)
 
     async def _listen_audio(self):
-        print("[JARVIS] 🎤 Mic iniciado")
+        print("[MIN] 🎤 Mic iniciado")
         loop = asyncio.get_event_loop()
 
         def callback(indata, frames, time_info, status):
+            import time
+            now = time.time()
+            with self._speaking_lock:
+                min_speaking = self._is_speaking
+                if min_speaking:
+                    self._last_speak_time = now
+
+            provider = _get_llm_provider()
+
             if getattr(self, "is_sleeping", False):
                 if getattr(self, "vosk_recognizer", None):
                     audio_data = indata.tobytes()
                     if self.vosk_recognizer.AcceptWaveform(audio_data):
                         res = json.loads(self.vosk_recognizer.Result())
                         text = res.get("text", "")
-                        if "jarvis" in text.lower():
+                        if "min" in text.lower():
                             self.is_sleeping = False
                             self.ui.set_state("LISTENING")
                             self.ui.write_log("SYS: 🟢 ¡Despierto!")
@@ -2831,27 +3092,38 @@ class JarvisLive:
                             except: pass
                 return
 
-            with self._speaking_lock:
-                jarvis_speaking = self._is_speaking
-            if not jarvis_speaking and not self.ui.muted:
-                # Calculate RMS audio level for sphere visualization
+            is_cooling_down = (now - getattr(self, "_last_speak_time", 0.0)) < 0.8
+            if not min_speaking and not is_cooling_down and not self.ui.muted:
                 try:
                     rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
                     self.ui.set_audio_level(min(1.0, rms * 18))
                 except Exception:
-                    pass
-                data = indata.tobytes()
-                # Silently drop if queue is full (during long tool calls)
-                def _safe_put(q, item):
-                    try:
-                        q.put_nowait(item)
-                    except Exception:
-                        pass  # Queue full — discard; prevents QueueFull crash
-                loop.call_soon_threadsafe(
-                    _safe_put, self.out_queue, {"data": data, "mime_type": "audio/pcm"}
-                )
-            elif jarvis_speaking:
-                # When JARVIS is speaking, also update level (from playback perspective)
+                    rms = 0.0
+                
+                audio_data = indata.tobytes()
+                
+                if provider == "local_openai" and getattr(self, "vosk_recognizer", None):
+                    if self.vosk_recognizer.AcceptWaveform(audio_data):
+                        res = json.loads(self.vosk_recognizer.Result())
+                        text = res.get("text", "").strip()
+                        if text:
+                            self.ui.write_log(f"Tú (Voz Local): {text}")
+                            loop.call_soon_threadsafe(self._local_command_queue.put_nowait, text)
+                elif provider != "local_openai":
+                    if rms < 0.003:
+                        data = np.zeros_like(indata).tobytes()
+                    else:
+                        data = audio_data
+                        
+                    def _safe_put(q, item):
+                        try:
+                            q.put_nowait(item)
+                        except Exception:
+                            pass  # Queue full — discard; prevents QueueFull crash
+                    loop.call_soon_threadsafe(
+                        _safe_put, self.out_queue, {"data": data, "mime_type": "audio/pcm"}
+                    )
+            elif min_speaking:
                 try:
                     rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
                     self.ui.set_audio_level(min(1.0, rms * 15))
@@ -2866,15 +3138,15 @@ class JarvisLive:
                 blocksize=CHUNK_SIZE,
                 callback=callback,
             ):
-                print("[JARVIS] 🎤 Mic stream open")
+                print("[MIN] 🎤 Mic stream open")
                 while True:
                     await asyncio.sleep(0.01)  # 10ms — máxima responsividad del mic
         except Exception as e:
-            print(f"[JARVIS] ❌ Mic: {e}")
+            print(f"[MIN] ❌ Mic: {e}")
             raise
 
     async def _receive_audio(self):
-        print("[JARVIS] 👂 Recv iniciado")
+        print("[MIN] 👂 Recv iniciado")
         out_buf, in_buf = [], []
         _first_chunk   = True
         _last_tool     = None   # track which tool was executing when error hit
@@ -2895,9 +3167,9 @@ class JarvisLive:
                             if txt:
                                 out_buf.append(txt)
                                 if _first_chunk:
-                                    self.ui.clear_jarvis_response()
+                                    self.ui.clear_min_response()
                                     _first_chunk = False
-                                self.ui.stream_jarvis_chunk(txt)
+                                self.ui.stream_min_chunk(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
                             txt = _clean_transcript(sc.input_transcription.text)
@@ -2917,11 +3189,11 @@ class JarvisLive:
                             _first_chunk = True
 
                     if response.tool_call:
-                        self.ui.clear_jarvis_response()
+                        self.ui.clear_min_response()
                         _first_chunk = True
                         fcs = response.tool_call.function_calls
                         for fc in fcs:
-                            print(f"[JARVIS] 📞 {fc.name}")
+                            print(f"[MIN] 📞 {fc.name}")
                             _last_tool = fc.name
                         # Execute all tool calls in parallel when there are multiple
                         if len(fcs) > 1:
@@ -2935,7 +3207,7 @@ class JarvisLive:
                             )
                             _last_tool = None  # only clear AFTER successful send
                         except Exception as tool_err:
-                            print(f"[JARVIS] ❌ send_tool_response failed: {tool_err}")
+                            print(f"[MIN] ❌ send_tool_response failed: {tool_err}")
                             raise
         except Exception as e:
             msg  = str(e)
@@ -2943,15 +3215,15 @@ class JarvisLive:
             # Detect 1011 (internal server error) regardless of exception type
             if code == 1011 or "1011" in msg or "Internal error" in msg:
                 tool_info = f" durante '{_last_tool}'" if _last_tool else ""
-                print(f"[JARVIS] ⚡ API 1011{tool_info} — reconectando...")
+                print(f"[MIN] ⚡ API 1011{tool_info} — reconectando...")
                 self._api_1011_tool = _last_tool
             else:
-                print(f"[JARVIS] ❌ Recv: {e}")
+                print(f"[MIN] ❌ Recv: {e}")
                 traceback.print_exc()
             raise
 
     async def _play_audio(self):
-        print("[JARVIS] 🔊 Play iniciado")
+        print("[MIN] 🔊 Play iniciado")
 
         stream = sd.RawOutputStream(
             samplerate=RECEIVE_SAMPLE_RATE,
@@ -2963,7 +3235,8 @@ class JarvisLive:
 
         # Jitter buffer: accumulate a few chunks before playback to prevent underruns
         _jitter_buf: list[bytes] = []
-        _JITTER_TARGET = 1  # ~20ms — start playback ASAP for low latency
+        _JITTER_TARGET = 3  # ~60ms — smooth out network jitter and prevent hoarse voice
+        prebuffering = True
 
         try:
             while True:
@@ -2973,32 +3246,47 @@ class JarvisLive:
                         timeout=0.05   # 50ms — faster turn-complete detection
                     )
                 except asyncio.TimeoutError:
-                    # Must check turn_done + empty BEFORE jitter guard,
-                    # otherwise 1-2 stuck chunks in jitter_buf prevent
-                    # ever reaching the turn_done check → infinite SPEAKING loop.
                     if (
                         self._turn_done_event
                         and self._turn_done_event.is_set()
                         and self.audio_in_queue.empty()
                     ):
                         # Drain remaining jitter buffer before stopping
-                        for buffered in _jitter_buf:
+                        while _jitter_buf:
+                            buffered = _jitter_buf.pop(0)
+                            try:
+                                import numpy as np
+                                play_data = np.frombuffer(buffered, dtype=np.int16)
+                                rms = float(np.sqrt(np.mean(play_data.astype(np.float32) ** 2))) / 32768.0
+                                self.ui.set_audio_level(min(1.0, rms * 25))
+                            except Exception:
+                                pass
                             await asyncio.to_thread(stream.write, buffered)
-                        _jitter_buf.clear()
                         self.set_speaking(False)
                         self._turn_done_event.clear()
+                        prebuffering = True
                     continue
 
                 self.set_speaking(True)
                 _jitter_buf.append(chunk)
 
-                # Once we have enough chunks buffered, drain them to the output stream
-                if len(_jitter_buf) >= _JITTER_TARGET:
-                    for buffered in _jitter_buf:
-                        await asyncio.to_thread(stream.write, buffered)
-                    _jitter_buf.clear()
+                # Play one chunk if we are no longer prebuffering
+                if prebuffering:
+                    if len(_jitter_buf) >= _JITTER_TARGET:
+                        prebuffering = False
+                
+                if not prebuffering:
+                    buffered = _jitter_buf.pop(0)
+                    try:
+                        import numpy as np
+                        play_data = np.frombuffer(buffered, dtype=np.int16)
+                        rms = float(np.sqrt(np.mean(play_data.astype(np.float32) ** 2))) / 32768.0
+                        self.ui.set_audio_level(min(1.0, rms * 25))
+                    except Exception:
+                        pass
+                    await asyncio.to_thread(stream.write, buffered)
         except Exception as e:
-            print(f"[JARVIS] ❌ Play: {e}")
+            print(f"[MIN] ❌ Play: {e}")
             raise
         finally:
             self.set_speaking(False)
@@ -3006,6 +3294,9 @@ class JarvisLive:
             stream.close()
 
     async def run(self):
+        # Initialize local command queue
+        self._local_command_queue = asyncio.Queue()
+
         client = genai.Client(
             api_key=_get_api_key(),
             http_options={"api_version": "v1beta"}
@@ -3016,12 +3307,34 @@ class JarvisLive:
 
         while True:
             try:
-                print("[JARVIS] 🔌 Conectando...")
+                provider = _get_llm_provider()
+                if provider == "local_openai":
+                    # Local OpenAI compatible runner loop!
+                    self._loop = asyncio.get_event_loop()
+                    self.audio_in_queue = asyncio.Queue()
+                    self.out_queue = asyncio.Queue(maxsize=5)
+                    self._turn_done_event = asyncio.Event()
+                    self._reconnect_event = asyncio.Event()
+
+                    self.ui.set_state("LISTENING")
+                    self.ui.write_log("SYS: MIN en línea (Modo Local).")
+                    
+                    async with asyncio.TaskGroup() as tg:
+                        tg.create_task(self._listen_audio())
+                        tg.create_task(self._play_audio())
+                        tg.create_task(self._watch_reconnect())
+                        tg.create_task(self._stability_monitor())
+                        tg.create_task(self._local_openai_consumer())
+                        
+                        await self._reconnect_event.wait()
+                    continue
+
+                print("[MIN] 🔌 Conectando...")
                 self.ui.set_state("THINKING")
                 config = self._build_config()
 
                 async with (
-                    client.aio.live.connect(model=LIVE_MODEL, config=config) as session,
+                    client.aio.live.connect(model=_get_live_model(), config=config) as session,
                     asyncio.TaskGroup() as tg,
                 ):
                     self.session          = session
@@ -3031,9 +3344,9 @@ class JarvisLive:
                     self._turn_done_event = asyncio.Event()
                     self._reconnect_event = asyncio.Event()
 
-                    print("[JARVIS] ✅ Conectado.")
+                    print("[MIN] ✅ Conectado.")
                     self.ui.set_state("LISTENING")
-                    self.ui.write_log("SYS: JARVIS en línea.")
+                    self.ui.write_log("SYS: MIN en línea.")
                     reconnect_delay   = 1.0   # reset backoff on successful connection
                     consecutive_fails = 0
                     self._api_1011_tool = None   # clear 1011 tool tracker
@@ -3048,7 +3361,7 @@ class JarvisLive:
                                 speaking_fn=lambda: self._is_speaking,
                             )
                         except Exception as _vge:
-                            print(f"[JARVIS] VisionGuardian init error: {_vge}")
+                            print(f"[MIN] VisionGuardian init error: {_vge}")
                         # Auto morning brief (6am–12pm, once per day)
                         _hour = __import__("datetime").datetime.now().hour
                         if 6 <= _hour < 12 and not already_briefed_today():
@@ -3065,6 +3378,7 @@ class JarvisLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._watch_reconnect())
+                    tg.create_task(self._stability_monitor())
 
             except Exception as e:
                 exceptions = e.exceptions if isinstance(e, ExceptionGroup) else [e]
@@ -3083,15 +3397,15 @@ class JarvisLive:
                         # Timeout de WebSocket al conectar — error de red transitorio.
                         # NO incrementar consecutive_fails: sólo reintento rápido.
                         is_handshake_timeout = True
-                        print(f"[JARVIS] ⏱️ Timeout al conectar — reintentando en 1s...")
+                        print(f"[MIN] ⏱️ Timeout al conectar — reintentando en 1s...")
                     elif "1011" in msg or "Internal error" in msg:
                         tool_hint = self._api_1011_tool or ""
-                        print(f"[JARVIS] ⚡ API 1011{tool_hint and ' durante '+tool_hint} — reconectando...")
+                        print(f"[MIN] ⚡ API 1011{tool_hint and ' durante '+tool_hint} — reconectando...")
                         consecutive_fails += 1
                         if consecutive_fails >= 4:
                             self.ui.write_log(
                                 "SYS: ⚠️ Error 1011 repetido. Esperando para no saturar la API...\n"
-                                "SYS: Si persiste más de 2 min, reiniciá JARVIS."
+                                "SYS: Si persiste más de 2 min, reiniciá MIN."
                             )
                         elif tool_hint:
                             self.ui.write_log(f"SYS: Error de servidor al ejecutar '{tool_hint}'. Reconectando...")
@@ -3099,15 +3413,15 @@ class JarvisLive:
                             self.ui.write_log("SYS: Error de servidor 1011. Reconectando...")
                     elif "1008" in msg or "policy violation" in msg.lower() or "not found for API version" in msg:
                         # Model not available / wrong API version — log clearly, retry with same model
-                        print(f"[JARVIS] ⚠️ Modelo no disponible en esta versión de API: {msg[:120]}")
+                        print(f"[MIN] ⚠️ Modelo no disponible en esta versión de API: {msg[:120]}")
                         self.ui.write_log("SYS: ⚠️ Modelo no disponible. Reintentando...")
                         consecutive_fails += 1
                     elif "1000" in msg or "going away" in msg.lower():
                         # Cierre normal de la sesión (expiró ~15 min) — silencioso
-                        print(f"[JARVIS] 🔄 Sesión expirada — reconectando...")
+                        print(f"[MIN] 🔄 Sesión expirada — reconectando...")
                         consecutive_fails = 0   # reset: no es un fallo
                     else:
-                        print(f"[JARVIS] ⚠️ {exc}")
+                        print(f"[MIN] ⚠️ {exc}")
                         traceback.print_exc()
                         consecutive_fails += 1
 
@@ -3138,16 +3452,16 @@ class JarvisLive:
             import random as _rnd
             jitter = _rnd.uniform(0, reconnect_delay * 0.25)
             total  = reconnect_delay + jitter
-            print(f"[JARVIS] 🔄 Reconectando en {total:.1f}s...")
+            print(f"[MIN] 🔄 Reconectando en {total:.1f}s...")
             await asyncio.sleep(total)
 
 def main():
     # ── Single Instance Lock ──────────────────────────────────────────────────
     import ctypes
     global _single_instance_mutex
-    _single_instance_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "JARVIS_AI_SINGLE_INSTANCE_MUTEX")
+    _single_instance_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "MIN_AI_SINGLE_INSTANCE_MUTEX")
     if ctypes.windll.kernel32.GetLastError() == 183: # ERROR_ALREADY_EXISTS
-        print("[JARVIS] Ya hay una instancia en ejecución. Cerrando.")
+        print("[MIN] Ya hay una instancia en ejecución. Cerrando.")
         sys.exit(0)
 
     # ── License check ─────────────────────────────────────────────────────────
@@ -3163,157 +3477,80 @@ def main():
                 cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        
+
         gemini = cfg.get("gemini_api_key", "").strip()
         openrouter = cfg.get("openrouter_api_key", "").strip()
-        
+
         if gemini and openrouter:
+            print("[MIN] API keys detectadas correctamente.")
             return
-            
-        from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
-        from PyQt6.QtCore import Qt
-        
-        # We need an app instance before dialogs
-        app = QApplication.instance() or QApplication(sys.argv)
-        
-        dialog = QDialog()
-        dialog.setWindowTitle("Configuración Inicial de JARVIS")
-        dialog.resize(450, 250)
-        dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        layout = QVBoxLayout(dialog)
-        
-        lbl_info = QLabel("¡Bienvenido a JARVIS!\n\nPor favor, ingresa tus API keys para continuar.\nEstas se guardarán localmente y de forma segura.")
-        lbl_info.setStyleSheet("font-size: 14px; font-weight: bold; margin-bottom: 10px;")
-        layout.addWidget(lbl_info)
-        
-        lbl_gemini = QLabel("Gemini API Key:")
-        layout.addWidget(lbl_gemini)
-        inp_gemini = QLineEdit()
-        inp_gemini.setText(gemini)
-        inp_gemini.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(inp_gemini)
-        
-        lbl_openrouter = QLabel("OpenRouter API Key:")
-        layout.addWidget(lbl_openrouter)
-        inp_openrouter = QLineEdit()
-        inp_openrouter.setText(openrouter)
-        inp_openrouter.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(inp_openrouter)
-        
-        btn_save = QPushButton("Guardar y Continuar")
-        btn_save.setStyleSheet("background-color: #0078D7; color: white; font-weight: bold; padding: 8px; border-radius: 4px;")
-        layout.addWidget(btn_save)
-        
-        def on_save():
-            g = inp_gemini.text().strip()
-            o = inp_openrouter.text().strip()
-            if not g or not o:
-                QMessageBox.warning(dialog, "Error", "Ambas claves son obligatorias.")
-                return
-            cfg["gemini_api_key"] = g
-            cfg["openrouter_api_key"] = o
-            API_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            API_CONFIG_PATH.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
-            dialog.accept()
-            
-        btn_save.clicked.connect(on_save)
-        
-        result = dialog.exec()
-        if result != QDialog.DialogCode.Accepted:
-            sys.exit(0)
+
+        # In Tauri mode, API keys are configured from the Settings UI panel
+        missing = []
+        if not gemini:
+            missing.append("Gemini API Key")
+        if not openrouter:
+            missing.append("OpenRouter API Key")
+
+        print("[MIN] ⚠️  Faltan las siguientes API keys: " + ", ".join(missing))
+        print("[MIN] Configúralas desde el panel de Configuración en la interfaz Tauri.")
+        print("[MIN] MIN iniciará igualmente, pero algunas funciones estarán limitadas.")
 
     _ensure_both_api_keys()
 
-    ui = JarvisUI("face.png")
+    ui = MinUI("face.png")
 
-    # --- UI COSMETICS PATCH ---
+    # --- Global Hotkey Setup (INSERT key to wake/unmute MIN) ---
     try:
-        if hasattr(ui, "_win"):
-            # Aumentar transparencia (Glassmorphism)
-            ui._win.setWindowOpacity(0.85)
-            # Reemplazar textos "Beta" y "Gratuito"
-            from PyQt6.QtWidgets import QLabel
-            for label in ui._win.findChildren(QLabel):
-                text_lower = label.text().lower()
-                if "beta" in text_lower or "gratuita" in text_lower or "gratuito" in text_lower or "premium" in text_lower:
-                    try:
-                        # Ocultar el contenedor completo del banner (incluye el botón PRO)
-                        label.parentWidget().hide()
-                    except:
-                        label.hide()
+        def _setup_global_hotkey():
+            import ctypes
+            import ctypes.wintypes
 
-            # 2. Add keyboard shortcut & Global Hotkey (INS / Insert key) to wake up JARVIS
-            from PyQt6.QtGui import QKeySequence, QShortcut
-            from PyQt6.QtCore import Qt, QTimer
+            def on_hotkey_triggered():
+                """Toggle mute state via global INSERT hotkey."""
+                if getattr(ui, "muted", False):
+                    ui.muted = False
+                    ui.set_state("LISTENING")
+                    ui.write_log("SYS: 🎤 Micrófono ACTIVADO vía atajo INS.")
+                else:
+                    ui.set_state("LISTENING")
+                    ui.write_log("SYS: 🔔 MIN en foco vía atajo INS.")
 
-            def on_shortcut_triggered():
-                # Wake up / unmute JARVIS
-                if hasattr(ui, "_win"):
-                    # Si está muteado, desmutearlo para que escuche
-                    if getattr(ui, "muted", False):
-                        if hasattr(ui._win, "_toggle_mute"):
-                            ui._win._toggle_mute()
-                            ui.write_log("SYS: 🎤 Micrófono ACTIVADO vía atajo INS.")
-                    else:
-                        # Si ya está activo, mostrar/restaurar la ventana principal y enfocarla
-                        if hasattr(ui._win, "showNormal"):
-                            ui._win.showNormal()
-                            ui._win.activateWindow()
-                            ui.write_log("SYS: 🔔 JARVIS en foco vía atajo INS.")
-                        
-                        # Cambiar estado visual a escuchando
-                        try:
-                            ui.set_state("LISTENING")
-                        except:
-                            pass
-
-            # A. PyQt Window Shortcut (for local window events)
-            local_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Insert), ui._win)
-            local_shortcut.activated.connect(on_shortcut_triggered)
-
-            # B. Win32 Native Global Hotkey Hook (for background capture)
-            def setup_global_hotkey():
-                import threading
-                import ctypes
-                import ctypes.wintypes
-
-                def hotkey_thread():
-                    user32 = ctypes.windll.user32
-                    # MOD_NOREPEAT = 0x4000
-                    # VK_INSERT = 0x2D
-                    try:
-                        if not user32.RegisterHotKey(None, 99, 0x0000, 0x2D):
-                            print("[HOTKEY] Error registering global Insert hotkey.")
-                            return
-                    except Exception as e:
-                        print(f"[HOTKEY] Exception registering global hotkey: {e}")
+            def hotkey_thread():
+                user32 = ctypes.windll.user32
+                # VK_INSERT = 0x2D, no modifier keys
+                try:
+                    if not user32.RegisterHotKey(None, 99, 0x0000, 0x2D):
+                        print("[HOTKEY] Error registering global Insert hotkey.")
                         return
+                except Exception as e:
+                    print(f"[HOTKEY] Exception registering global hotkey: {e}")
+                    return
 
-                    try:
-                        msg = ctypes.wintypes.MSG()
-                        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
-                            if msg.message == 0x0312: # WM_HOTKEY
-                                if msg.wParam == 99:
-                                    # Thread-safely trigger UI callback inside PyQt event loop
-                                    QTimer.singleShot(0, on_shortcut_triggered)
-                            user32.TranslateMessage(ctypes.byref(msg))
-                            user32.DispatchMessageW(ctypes.byref(msg))
-                    finally:
-                        user32.UnregisterHotKey(None, 99)
+                try:
+                    msg = ctypes.wintypes.MSG()
+                    while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+                        if msg.message == 0x0312:  # WM_HOTKEY
+                            if msg.wParam == 99:
+                                # Thread-safe: schedule callback
+                                threading.Thread(target=on_hotkey_triggered, daemon=True).start()
+                        user32.TranslateMessage(ctypes.byref(msg))
+                        user32.DispatchMessageW(ctypes.byref(msg))
+                finally:
+                    user32.UnregisterHotKey(None, 99)
 
-                threading.Thread(target=hotkey_thread, daemon=True).start()
+            threading.Thread(target=hotkey_thread, daemon=True).start()
 
-            setup_global_hotkey()
-            print("[PATCH] Avengers: Age of Ultron golden aesthetics & Insert global hotkey loaded successfully!")
-
+        _setup_global_hotkey()
+        print("[MIN] Global INSERT hotkey registered successfully.")
     except Exception as e:
-        print(f"[PATCH] Cosmetics & Shortcut patch failed: {e}")
+        print(f"[MIN] Global hotkey setup failed: {e}")
 
     def runner():
         ui.wait_for_api_key()
-        jarvis = JarvisLive(ui)
+        min_live = MinLive(ui)
         try:
-            asyncio.run(jarvis.run())
+            asyncio.run(min_live.run())
         except KeyboardInterrupt:
             print("\n🔴 Apagando...")
 

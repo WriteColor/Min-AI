@@ -16,6 +16,14 @@ def _get_api_key() -> str:
     except Exception:
         return ""
 
+
+def _get_model() -> str:
+    try:
+        data = json.loads(API_FILE.read_text(encoding="utf-8"))
+        return data.get("vision_model", "google/gemini-2.5-flash")
+    except Exception:
+        return "google/gemini-2.5-flash"
+
 def _capture_screen_base64() -> str:
     """
     Captura la pantalla principal, la redimensiona/comprime y la devuelve en base64.
@@ -64,14 +72,14 @@ def screen_vision(parameters: dict, player=None) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/jarvis-beta",
-        "X-Title": "JARVIS AI Assistant",
+        "HTTP-Referer": "https://github.com/min-beta", #The Repo is not avaible right now, but we can use this as a placeholder for the referer header
+        "X-Title": "MIN AI Assistant",
         "Content-Type": "application/json"
     }
     
     # Payload multimodal de OpenRouter (estándar OpenAI)
     payload = {
-        "model": "google/gemini-2.5-flash",
+        "model": _get_model(),
         "max_tokens": 1500,
         "messages": [
             {

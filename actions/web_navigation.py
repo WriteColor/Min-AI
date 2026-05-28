@@ -1,8 +1,8 @@
 import urllib.request
 import urllib.parse
 import re
-import webbrowser
 import traceback
+from actions.browser_registry import launch_url
 
 def web_navigation(parameters: dict, player=None) -> str:
     """
@@ -22,14 +22,21 @@ def web_navigation(parameters: dict, player=None) -> str:
                 req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
                 html = urllib.request.urlopen(req).read().decode('utf-8')
                 
-                # Buscar el primer ID de video (watch?v=) en el HTML usando regex
-                video_ids = re.findall(r"watch\?v=(\S{11})", html)
-                if video_ids:
-                    first_video_id = video_ids[0]
+                # Extraer el primer videoId de la respuesta JSON inyectada en el HTML
+                video_ids = re.findall(r'"videoId":"([a-zA-Z0-9_-]{11})"', html)
+                
+                # Filtrar IDs repetidos manteniendo el orden
+                unique_ids = []
+                for vid in video_ids:
+                    if vid not in unique_ids:
+                        unique_ids.append(vid)
+                
+                if unique_ids:
+                    first_video_id = unique_ids[0]
                     video_url = f"https://www.youtube.com/watch?v={first_video_id}"
                     
                     # Abrir en el navegador por defecto
-                    webbrowser.open(video_url)
+                    launch_url(video_url)
                     
                     if player and hasattr(player, "set_state"):
                         player.set_state("SUCCESS")
@@ -37,15 +44,15 @@ def web_navigation(parameters: dict, player=None) -> str:
                     return f"He reproducido '{query}' en YouTube automáticamente (Abriendo: {video_url})."
                 else:
                     # Si falla el regex, abrimos al menos los resultados de búsqueda
-                    webbrowser.open(search_url)
+                    launch_url(search_url)
                     return f"Abrí los resultados de búsqueda en YouTube para '{query}', pero no pude auto-reproducir el video."
             except Exception as e_req:
-                webbrowser.open(search_url)
+                launch_url(search_url)
                 return f"Abrí YouTube con tu búsqueda '{query}'. Hubo un error extrayendo el enlace directo: {e_req}"
 
         elif action == "search":
             search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
-            webbrowser.open(search_url)
+            launch_url(search_url)
             return f"He abierto una búsqueda en Google para '{query}'."
 
         else:
