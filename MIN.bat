@@ -178,7 +178,7 @@ echo.
 echo %PURPLE%--- Verificacion de archivos criticos ---%RESET%
 if exist "main.py" (echo   %GREEN%[OK] main.py%RESET%) else (echo   %RED%[!!] main.py NO ENCONTRADO%RESET%)
 if exist "ui.py" (echo   %GREEN%[OK] ui.py%RESET%) else (echo   %RED%[!!] ui.py NO ENCONTRADO%RESET%)
-if exist "config\api_keys.json" (echo   %GREEN%[OK] config\api_keys.json%RESET%) else (echo   %RED%[!!] config\api_keys.json NO ENCONTRADO%RESET%)
+if exist "config\config.json" (echo   %GREEN%[OK] config\config.json%RESET%) else (echo   %RED%[!!] config\config.json NO ENCONTRADO%RESET%)
 if exist "config\vosk_model" (echo   %GREEN%[OK] config\vosk_model%RESET%) else (echo   %YELLOW%[--] config\vosk_model - opcional%RESET%)
 if exist ".venv" (echo   %GREEN%[OK] .venv%RESET%) else (echo   %RED%[!!] .venv - NO ENCONTRADO, ejecuta MIN.bat install%RESET%)
 if exist "Min-UI\dist" (echo   %GREEN%[OK] Min-UI\dist%RESET%) else (echo   %YELLOW%[--] Min-UI\dist - compilar con pnpm build%RESET%)

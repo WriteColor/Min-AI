@@ -233,8 +233,8 @@ def main():
     print()
 
     config_dir = os.path.join(".", "config")
-    api_keys_path = os.path.join(config_dir, "api_keys.json")
-    api_keys_template = os.path.join(config_dir, "api_keys.example.json")
+    api_keys_path = os.path.join(config_dir, "config.json")
+    api_keys_template = os.path.join(config_dir, "config.example.json")
     rules_path = os.path.join(config_dir, "rules.json")
 
     if not os.path.exists(config_dir):
@@ -244,7 +244,7 @@ def main():
     if not os.path.exists(api_keys_path):
         if os.path.exists(api_keys_template):
             shutil.copy2(api_keys_template, api_keys_path)
-            print(f"{GREEN}[OK] Archivo api_keys.json creado desde plantilla.{RESET}")
+            print(f"{GREEN}[OK] Archivo config.json creado desde plantilla.{RESET}")
         else:
             default_config = {
                 "gemini_api_key": "",
@@ -274,7 +274,7 @@ def main():
             }
             with open(api_keys_path, "w", encoding="utf-8") as f:
                 json.dump(default_config, f, indent=4)
-            print(f"{GREEN}[OK] Archivo api_keys.json creado con valores por defecto.{RESET}")
+            print(f"{GREEN}[OK] Archivo config.json creado con valores por defecto.{RESET}")
         print(f"{YELLOW}[INFO] Configura tus API Keys desde el panel de Configuración en la UI.{RESET}")
     else:
         # Migrate: remove deprecated fields from existing config
@@ -290,10 +290,10 @@ def main():
             if removed:
                 with open(api_keys_path, "w", encoding="utf-8") as f:
                     json.dump(cfg, f, indent=4)
-                print(f"{YELLOW}[INFO] Campos obsoletos eliminados de api_keys.json: {', '.join(removed)}{RESET}")
+                print(f"{YELLOW}[INFO] Campos obsoletos eliminados de config.json: {', '.join(removed)}{RESET}")
         except Exception:
             pass
-        print(f"{GREEN}[OK] Archivo api_keys.json existente detectado.{RESET}")
+        print(f"{GREEN}[OK] Archivo config.json existente detectado.{RESET}")
 
     if not os.path.exists(rules_path):
         with open(rules_path, "w", encoding="utf-8") as f:
@@ -392,7 +392,7 @@ def health_check():
     checks = [
         ("main.py",              True),
         ("ui.py",                True),
-        ("config/api_keys.json", True),
+        ("config/config.json", True),
         ("config/vosk_model",    False),
         (".venv",                True),
         ("Min-UI/dist",       False),
@@ -413,7 +413,7 @@ def health_check():
             print(f"  {YELLOW}[–] {path} — Opcional{RESET}")
 
     # Check API keys
-    api_path = os.path.join("config", "api_keys.json")
+    api_path = os.path.join("config", "config.json")
     if os.path.exists(api_path):
         try:
             cfg = json.loads(open(api_path, encoding="utf-8").read())
@@ -429,7 +429,7 @@ def health_check():
                     missing.append("OpenRouter")
                 print(f"  {YELLOW}[–] API Keys faltantes: {', '.join(missing)}{RESET}")
         except Exception:
-            print(f"  {YELLOW}[–] No se pudo leer api_keys.json{RESET}")
+            print(f"  {YELLOW}[–] No se pudo leer config.json{RESET}")
 
     if all_ok:
         print(f"\n  {GREEN}Estado general: ✓ Todo correcto{RESET}")

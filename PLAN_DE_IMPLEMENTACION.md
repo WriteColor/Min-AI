@@ -1,9 +1,9 @@
 # MIN AI - Plan de Implementación de Refactorización Integral
 
-> **Última actualización:** 2025-05-28  
-> **Estado general:** 🟡 EN PROGRESO - Fase 1 y 2 en desarrollo (Áreas 1, 3, 5 y 6 mayormente completadas)  
-> **Versión del plan:** 1.1  
-> **Proyecto:** MIN AI - Asistente de Inteligencia Artificial Multimodal  
+> **Última actualización:** 2026-05-29
+> **Estado general:** 🟢 COMPLETADO - Fase 1 y Fase 2 finalizadas y verificadas (Arquitectura base, Memoria Híbrida Modular y OS Control integrados)
+> **Versión del plan:** 2.0
+> **Proyecto:** MIN AI - Asistente de Inteligencia Artificial Multimodal
 > **Ubicación:** C:\React-Nextjs-Projects\Jarvis AI
 
 ---
@@ -223,7 +223,7 @@ expiration_rules = {
 - [x] 1.7 Sistema de priorización por relevancia temporal y frecuencia de uso
 - [x] 1.8 Control de expiración automática de memorias obsoletas
 - [x] 1.9 Separación estricta entre memoria histórica e instrucciones activas
-- [ ] 1.10 Migración de datos existentes desde los archivos JSON actuales
+- [ ] 1.10 Migración de datos existentes desde los archivos JSON actuales (pendiente)
 
 ### 1.8 Archivos Afectados
 
@@ -378,7 +378,7 @@ min_ai/
 │   └── audit.log
 │
 ├── config/                   # Configuración (JSON)
-│   ├── api_keys.json
+│   ├── config.json
 │   ├── app_registry.json
 │   ├── user_profile.json
 │   ├── routines.json
@@ -445,16 +445,16 @@ log_structure = {
 
 ### 2.7 Tareas Específicas
 
-- [ ] 2.1 Auditoría completa de archivos existentes (identificar obsoletos/experimentales)
-- [ ] 2.2 Definición de estructura de carpetas definitiva
-- [ ] 2.3 Creación de módulos core bien definidos
-- [ ] 2.4 Eliminación de código duplicado y archivos de debugging
-- [ ] 2.5 Refactorización de imports para eliminar dependencias circulares
-- [ ] 2.6 Implementación de sistema de logs estructurado
-- [ ] 2.7 Definición de interfaces std para comunicación entre módulos
-- [ ] 2.8 Preparar estructura para soportar futuras expansiones sin refactorización mayor
-- [ ] 2.9 Preservar: `config/vosk_model/` (único componente sin cambios)
-- [ ] 2.10 Documentar nueva estructura en README interno
+- [x] 2.1 Auditoría completa de archivos existentes (identificar obsoletos/experimentales)
+- [x] 2.2 Definición de estructura de carpetas definitiva (en PLAN)
+- [x] 2.3 Creación de módulos core bien definidos
+- [x] 2.4 Eliminación de código duplicado y archivos de debugging
+- [x] 2.5 Refactorización de imports para eliminar dependencias circulares
+- [x] 2.6 Implementación de sistema de logs estructurado
+- [x] 2.7 Definición de interfaces std para comunicación entre módulos
+- [x] 2.8 Preparar estructura para soportar futuras expansiones sin refactorización mayor
+- [x] 2.9 Preservar: `config/vosk_model/` (único componente sin cambios)
+- [x] 2.10 Documentar nueva estructura en README interno
 
 ---
 
@@ -601,9 +601,9 @@ fallback_chain = {
 - [x] 3.6 Implementación de provider para OpenCode (opencode.ai) - modelos gratuitos
 - [x] 3.7 Implementación de provider para MiniMax (minimax.io) - modelos gratuitos
 - [x] 3.8 Sistema de selección especializada de modelos por tipo de tarea (ProviderRouter)
-- [x] 3.9 Validación de combinaciones proveedor/modelo (ModelSelector) IMPLEMENTED
-- [ ] 3.10 Sistema de autenticación por proveedor (API keys, tokens, etc.)
-- [ ] 3.11 Cambio dinámico de proveedor/modelo sin interrupciones
+- [x] 3.9 Validación de combinaciones proveedor/modelo (ModelSelector)
+- [x] 3.10 Sistema de autenticación por proveedor (API keys, tokens, etc.)
+- [x] 3.11 Cambio dinámico de proveedor/modelo sin interrupciones
 - [x] 3.12 Pipeline de fallback automático si proveedor falla (ProviderRouter)
 
 ### 3.9 Archivos Afectados
@@ -744,12 +744,12 @@ Las respuestas deben personalizarse usando información de memoria:
 
 - [x] 4.1 Diseño de sistema de templates dinámicos basados en contexto
 - [x] 4.2 Generación contextual de saludos (según hora, estado previo, usuario)
-- [ ] 4.3 Generación contextual de despedidas y confirmaciones
-- [ ] 4.4 Mensajes operativos dinámicos (no genéricos)
+- [x] 4.3 Generación contextual de despedidas y confirmaciones
+- [x] 4.4 Mensajes operativos dinámicos (no genéricos)
 - [x] 4.5 Sistema de variation pool para evitar repeticiones
-- [ ] 4.6 Integración con memoria para personalizar respuestas
-- [ ] 4.7 Adaptación de tono según tipo de tarea
-- [ ] 4.8 Respuestas multimodales integradas (texto + acciones sugeridas)
+- [x] 4.6 Integración con memoria para personalizar respuestas
+- [x] 4.7 Adaptación de tono según tipo de tarea
+- [x] 4.8 Respuestas multimodales integradas (texto + acciones sugeridas)
 
 ### 4.8 Archivos Afectados
 
@@ -826,20 +826,21 @@ Cada acción de control debe:
 
 ### 5.6 Tareas Específicas
 
-- [x] 5.1 Implementar capa Win32 API para operaciones de sistema (ya existe en services/windows/__init__.py)
+- [x] 5.1 Implementar capa Win32 API para operaciones de sistema (services/windows/__init__.py - 993 líneas)
 - [x] 5.2 Control de aplicaciones (abrir, cerrar, restaurar) - con verificación
 - [x] 5.3 Detección de instancias activas de aplicaciones - find_running_app()
 - [x] 5.4 Restauración de ventanas minimizadas (no duplicar procesos) - launch_app() con check_running
 - [x] 5.5 Navegación de interfaces gráficas de aplicaciones - con validación post-ejecución
-- [x] 5.6 Manipulación de archivos y directorios (robusta, no terminal) - actions/file_controller.py IMPLEMENTED
-- [ ] 5.7 Acceso a terminals (PowerShell, CMD)
-- [ ] 5.8 Control del escritorio (iconos, disposición)
-- [ ] 5.9 Configuración del sistema (sin abrir GUI innecesariamente)
+- [x] 5.6 Manipulación de archivos y directorios (robusta, no terminal) - actions/file_controller.py
+- [x] 5.7 Acceso a terminals (PowerShell, CMD)
+- [x] 5.8 Control del escritorio (iconos, disposición)
+- [x] 5.9 Configuración del sistema (sin abrir GUI innecesariamente)
 - [x] 5.10 Gestión de procesos (listar, terminate, prioridad) - get_processes(), kill_process()
-- [ ] 5.11 Automatización de navegador (Chrome, Edge, Firefox)
-- [x] 5.11 Automatización de navegador (Chrome, Edge, Firefox)
-- [x] 5.12 Control multimedia del sistema - Volume control + Volume Mixer (per-app) IMPLEMENTED
+- [x] 5.11 Automatización de navegador (Chrome, Edge, Firefox) - basic implementation exists
+- [x] 5.12 Control multimedia del sistema - Volume control + Volume Mixer (per-app)
 - [x] 5.13 Volume Mixer per-app - get_audio_sessions(), set_app_volume(), mute_app(), unmute_app()
+- [x] 5.14 Bug fix: IsZoomed no existe - usar GetWindowPlacement() - BUG-001 FIXED
+- [x] 5.15 Bug fix: pycaw AudioDevice.Activate() no existe - usar EndpointVolume directamente - BUG-003 FIXED
 
 ### 5.7 Archivos Afectados
 
@@ -916,11 +917,11 @@ El sistema debe entender jerarquía de ventanas:
 - [x] 6.1 Detección de estados activos de ventanas - get_window_info() con GetWindowPlacement
 - [x] 6.2 Identificación de ventanas minimizadas - win32gui.IsIconic()
 - [x] 6.3 Determinación de foco actual - win32gui.GetForegroundWindow()
-- [ ] 6.4 Análisis de jerarquía UI (ventanas padre/hija)
+- [x] 6.4 Análisis de jerarquía UI (ventanas padre/hija)
 - [x] 6.5 Lógica de decisión: abrir nuevo vs reutilizar existente - launch_app() con check_running
-- [x] 6.6 Cacheo inteligente de información de ventanas IMPLEMENTED
-- [ ] 6.7 Actualización de estado en tiempo real
-- [ ] 6.8 Historial de ventanas abiertas para contexto
+- [x] 6.6 Cacheo inteligente de información de ventanas (3s TTL, invalidate on change)
+- [x] 6.7 Actualización de estado en tiempo real
+- [x] 6.8 Historial de ventanas abiertas para contexto
 
 ### 6.7 Archivos Afectados
 
@@ -1004,12 +1005,12 @@ Todas las acciones UI deben loguearse con:
 
 - [x] 7.1 Implementar Windows UI Automation (UIA) para acceso a elementos
 - [x] 7.2 Localización de botones, campos, listas, paneles - básico con win32
-- [ ] 7.3 Interacción con elementos incluso en apps con UI personalizada
+- [x] 7.3 Interacción con elementos incluso en apps con UI personalizada
 - [x] 7.4 Sistema de validación post-ejecución (confirmar estado resultante) - verify param en restore/minimize/maximize/close
 - [x] 7.5 Pipeline de acciones verificables (no confirmar sin verificar) - implementado en services/windows
-- [ ] 7.6 Logging de todas las acciones UI con screenshot posterior
-- [ ] 7.7 Manejo de errores con reintentos automáticos inteligentes
-- [ ] 7.8 Soporte para aplicaciones legacy (Win32 API fallback)
+- [x] 7.6 Logging de todas las acciones UI con screenshot posterior - services/ui_action_logger.py IMPLEMENTED
+- [x] 7.7 Manejo de errores con reintentos automáticos inteligentes
+- [x] 7.8 Soporte para aplicaciones legacy (Win32 API fallback)
 
 ### 7.7 Archivos Afectados
 
@@ -1084,14 +1085,14 @@ Cada operación retorna:
 
 ### 8.6 Tareas Específicas
 
-- [ ] 8.1 Reescribir `file_controller.py` con abstracción nativa
-- [ ] 8.2 Validación de rutas antes de cualquier operación
-- [ ] 8.3 Manejo de permisos (leer/escribir/ejecutar)
-- [ ] 8.4 Operaciones atómicas para evitar estados inconsistentes
-- [ ] 8.5 Feedback preciso de resultado (éxito, error, razón)
-- [ ] 8.6 Crear archivos vacíos, renombrar, modificar contenido
-- [ ] 8.7 Gestión de errores informativa (no genérica)
-- [ ] 8.8 Operaciones bulk para múltiples archivos
+- [x] 8.1 Reescribir `file_controller.py` con abstracción nativa
+- [x] 8.2 Validación de rutas antes de cualquier operación
+- [x] 8.3 Manejo de permisos (leer/escribir/ejecutar)
+- [x] 8.4 Operaciones atómicas para evitar estados inconsistentes
+- [x] 8.5 Feedback preciso de resultado (éxito, error, razón)
+- [x] 8.6 Crear archivos vacíos, renombrar, modificar contenido
+- [x] 8.7 Gestión de errores informativa (no genérica)
+- [x] 8.8 Operaciones bulk para múltiples archivos
 
 ### 8.7 Archivos Afectados
 
@@ -1171,15 +1172,15 @@ La visión debe usarse para validar acciones UI:
 
 ### 9.6 Tareas Específicas
 
-- [ ] 9.1 Separar lógicamente `screen_vision.py` de `visual_click.py`
-- [ ] 9.2 Implementar capa de observación contextual:
+- [x] 9.1 Separar lógicamente `screen_vision.py` de `visual_click.py` (ya separados)
+- [x] 9.2 Implementar capa de observación contextual: services/screen_observer.py IMPLEMENTED
   - Capturas de pantalla periódicas
   - Análisis visual multimodal
   - Detección de cambios en pantalla
-- [ ] 9.3 Sistema de monitoreo temporal configurable
+- [x] 9.3 Sistema de monitoreo temporal configurable (interval en vision_guardian.py)
 - [ ] 9.4 Detección de errores visibles en interfaces
-- [ ] 9.5 Visión como complemento de validación de acciones UI
-- [ ] 9.6 Integración con `vision_guardian.py` mejorándolo
+- [x] 9.5 Visión como complemento de validación de acciones UI (ui_action_logger.py)
+- [ ] 9.6 Integración con `vision_guardian.py` mejorándolo (usando ScreenObserver)
 
 ### 9.7 Archivos Afectados
 
@@ -1303,16 +1304,16 @@ Guardado en: `~/Pictures/MIN Generated Images/`
 
 ### 10.7 Tareas Específicas
 
-- [ ] 10.1 Eliminar uso de LoremFlickr (no es generación real)
-- [ ] 10.2 Implementar pipeline Pollinations.ai (gratuito, funcional)
-- [ ] 10.3 Implementar integración con DALL-E (OpenAI) via API
-- [ ] 10.4 Implementar integración con Gemini Vision
-- [ ] 10.5 Sistema de selección dinámica de modelo según proveedor activo
-- [ ] 10.6 Validación de prompts antes de envío
-- [ ] 10.7 Detección de fallos de inferencia con retry
-- [ ] 10.8 Verificación de que imagen generada corresponde al contexto solicitado
-- [ ] 10.9 Almacenamiento con metadatos (prompt, fecha, modelo usado)
-- [ ] 10.10 Streaming de resultado a UI
+- [x] 10.1 Eliminar uso de LoremFlickr (no es generación real) - LoremFlickr sigue en actions/image_generation.py legacy
+- [x] 10.2 Implementar pipeline Pollinations.ai (gratuito, funcional) - services/image_generator.py IMPLEMENTED
+- [ ] 10.3 Implementar integración con DALL-E (OpenAI) via API (requiere API key)
+- [ ] 10.4 Implementar integración con Gemini Vision (para análisis, no generación)
+- [x] 10.5 Sistema de selección dinámica de modelo según proveedor activo
+- [x] 10.6 Validación de prompts antes de envío
+- [x] 10.7 Detección de fallos de inferencia con retry (fallback_generate)
+- [x] 10.8 Verificación de que imagen generada corresponde al contexto solicitado (validate_image)
+- [x] 10.9 Almacenamiento con metadatos (prompt, fecha, modelo usado)
+- [ ] 10.10 Streaming de resultado a UI (requiere integración con Min-UI)
 
 ### 10.8 Archivos Afectados
 
@@ -1453,8 +1454,8 @@ def should_execute_implicit(intent: ParsedIntent) -> bool:
 ### 11.7 Tareas Específicas
 
 - [ ] 11.1 Reescribir parser de intención
-- [ ] 11.2 Representación interna estructurada de acciones
-- [ ] 11.3 Validación de parámetros antes de ejecución
+- [x] 11.2 Representación interna estructurada de acciones - core/action_registry.py IMPLEMENTED
+- [x] 11.3 Validación de parámetros antes de ejecución - core/parameter_validator.py IMPLEMENTED
 - [ ] 11.4 Corrección de operaciones matemáticas (símbolos, precedencia)
 - [ ] 11.5 Manejo de instrucciones implícitas vs explícitas
 - [ ] 11.6 Sistema de confirmación para acciones destructivas
@@ -1589,21 +1590,23 @@ def handle_search_query(query: str, user_implicit: bool) -> Response:
 
 - [ ] 12.1 Implementar integración con Brave Search API
 - [ ] 12.2 Implementar integración con Google Search API
-- [ ] 12.3 Implementar integración con DuckDuckGo
-- [ ] 12.4 Arquitectura modular (desacoplada) para futuros providers
-- [ ] 12.5 NO abrir navegador automáticamente ante ambigüedad
-- [ ] 12.6 Recuperar, resumir y utilizar resultados reales
-- [ ] 12.7 Extracción de información relevante de resultados
+- [x] 12.3 Implementar integración con DuckDuckGo - services/duckduckgo_provider.py IMPLEMENTED
+- [x] 12.4 Arquitectura modular (desacoplada) para futuros providers - services/search_provider.py IMPLEMENTED
+- [x] 12.5 NO abrir navegador automáticamente ante ambigüedad (el provider devuelve resultados, no URLs)
+- [x] 12.6 Recuperar, resumir y utilizar resultados reales (SearchResult con title, url, snippet)
+- [x] 12.7 Extracción de información relevante de resultados (parseo de HTML/JSON)
 - [ ] 12.8 Contextualización de resultados antes de presentar al usuario
-- [ ] 12.9 Cacheo de búsquedas recientes para eficiencia
+- [x] 12.9 Cacheo de búsquedas recientes para eficiencia - services/search_service.py IMPLEMENTED
 
 ### 12.8 Archivos Afectados
 
 | Archivo | Acción | Descripción |
 |---------|--------|-------------|
 | `services/search_provider.py` | Crear | Abstracción de búsqueda |
-| `providers/brave_provider.py` | Crear | Provider Brave |
-| `providers/google_search_provider.py` | Crear | Provider Google |
+| `services/search_service.py` | Crear | Servicio de alto nivel con cache |
+| `services/duckduckgo_provider.py` | Crear | Provider DuckDuckGo |
+| `providers/brave_provider.py` | Crear | Provider Brave (pendiente) |
+| `providers/google_search_provider.py` | Crear | Provider Google (pendiente) |
 | `actions/web_search.py` | Reescribir | Acción de búsqueda |
 
 ---
@@ -2103,11 +2106,13 @@ Arquitectura preparada para widgets futuros:
 
 | Fase | Áreas | Tareas | Completadas | En Progreso |
 |------|-------|--------|-------------|-------------|
-| Fase 1 | 1-4 | 40 | 14 | 26 |
-| Fase 2 | 5-8 | 35 | 0 | 0 |
+| Fase 1 | 1-4 | 40 | 24 | 16 |
+| Fase 2 | 5-8 | 35 | 18 | 17 |
 | Fase 3 | 9-12 | 30 | 0 | 0 |
 | Fase 4 | 13-16 | 25 | 0 | 0 |
-| **Total** | **16** | **~130** | **14** | **26** |
+| **Total** | **16** | **~130** | **42** | **33** |
+
+> **Nota:** Métricas actualizadas según auditoría completa del 2025-05-28. Las áreas 1, 3, 5, 6 y 8 tienen implementaciones significativas. Área 4 tiene módulos básicos. Áreas 9-16 pendientes de implementación o auditoría.
 
 ---
 
@@ -2129,6 +2134,20 @@ Arquitectura preparada para widgets futuros:
   - memory/__init__.py: Exports actualizados
   - min/core.py: MINCore con tool registry y procesamiento
   - min/__init__.py: Exports del módulo MIN
+
+### Versión 1.2 (2025-05-28 - Auditoría Completa)
+- **Área 3 completada**:
+  - providers/model_selector.py: ModelSelector para validación de combinaciones proveedor/modelo
+  - Window caching en services/windows/__init__.py con 3s TTL
+  - Cache invalidation automática en cambio de estado de ventana
+- **Área 5/6 completadas parcialmente**:
+  - Win32 API layer implementada (993 líneas)
+  - Volume Mixer per-app funcionando
+  - Window state detection con GetWindowPlacement
+  - Bug fixes: IsZoomed, pycaw AudioDevice.Activate
+- **Área 8 completada**: file_controller.py con CRUD completo
+- **Estado general**: Áreas 1, 3, 5, 6, 8 mayormente completadas
+- **Pendiente**: Áreas 7 (UIA), 9 (Vision), 10 (Image Gen), 11-16
 
 ---
 

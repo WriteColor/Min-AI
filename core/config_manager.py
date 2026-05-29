@@ -5,7 +5,7 @@ Manages all configuration for MIN AI system.
 Handles loading, validation, and persistence of configs.
 
 Author: MIN AI Team
-Version: 1.0
+Version: 2.0
 """
 
 import json
@@ -13,7 +13,7 @@ import os
 import traceback
 from typing import Dict, Any, Optional, List
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 
 BASE_DIR = Path(__file__).parent.parent
@@ -23,10 +23,27 @@ CONFIG_DIR = BASE_DIR / "config"
 @dataclass
 class AppConfig:
     """Main application configuration."""
-    # Provider settings
-    active_provider: str = "gemini"
-    active_model: str = "gemini-2.5-flash"
+    # API Keys & Credentials
+    gemini_api_key: str = ""
+    openrouter_api_key: str = ""
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "http://127.0.0.1:8888/callback"
     
+    # Provider settings
+    llm_provider: str = "gemini"
+    active_provider: str = "gemini"  # Aliased/synced with llm_provider
+    active_model: str = "gemini-2.5-flash"
+    live_model: str = ""
+    vision_model: str = ""
+    openrouter_default_model: str = "google/gemini-2.5-flash"
+    
+    # Local LLM settings
+    local_openai_base_url: str = "http://127.0.0.1:1337/v1"
+    local_openai_model: str = "mistral-7b-instruct"
+    local_openai_api_key: str = ""
+    local_openai_reasoning: bool = False
+
     # Model assignments by task type
     model_assignments: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
         "general_reasoning": {"provider": "gemini", "model": "gemini-2.5-pro"},
@@ -38,10 +55,44 @@ class AppConfig:
     
     # UI settings
     theme: str = "dark"
-    language: str = "es"
+    language: str = "es-ES"
+    
+    # Audio/Voice settings
     voice_enabled: bool = True
     speech_rate: float = 1.0
+    min_voice: str = "Aoede"
+    mic_device: int = 0
+    speaker_device: str = ""
     
+    # Camera settings
+    camera_enabled: bool = True
+    camera_index: int = 0
+    
+    # System settings
+    gpu_acceleration: bool = True
+    max_memory_mb: float = 500.0
+    os_system: str = "windows"
+    timezone: str = "America/Tegucigalpa"
+    
+    # Browser settings
+    browser_preference: str = "auto"
+    browser_paths: Dict[str, str] = field(default_factory=lambda: {
+        "chrome": "",
+        "brave": "",
+        "edge": "",
+        "firefox": "",
+        "opera": "",
+        "opera_gx": "",
+        "vivaldi": "",
+        "tor": ""
+    })
+    
+    # Location settings
+    location_mode: str = "system"
+    location_city: str = ""
+    location_lat: str = ""
+    location_lon: str = ""
+
     # Behavior settings
     memory_enabled: bool = True
     context_depth: int = 10
@@ -52,7 +103,7 @@ class AppConfig:
     vosk_model_path: str = str(CONFIG_DIR / "vosk_model")
     assets_path: str = str(BASE_DIR / "assets")
     
-    # System
+    # System log/debug
     debug_mode: bool = False
     log_level: str = "INFO"
 
@@ -77,7 +128,7 @@ class ConfigManager:
         
         self._config = AppConfig()
         self._loaded = False
-        self._config_file = CONFIG_DIR / "app_config.json"
+        self._config_file = CONFIG_DIR / "config.json"
         self._load()
         self._initialized = True
     
@@ -89,36 +140,45 @@ class ConfigManager:
                     data = json.load(f)
                     self._apply_loaded_config(data)
                 self._loaded = True
+            else:
+                # If config.json doesn't exist, try to load from old app_config.json if exists
+                old_file = CONFIG_DIR / "app_config.json"
+                if old_file.exists():
+                    with open(old_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        self._apply_loaded_config(data)
+                    self.save()
+                    old_file.unlink()  # Clean up old file
+                    self._loaded = True
         except Exception as e:
             print(f"[ConfigManager] Load error: {e}")
             self._loaded = False
     
     def _apply_loaded_config(self, data: Dict):
-        """Apply loaded data to config object."""
+        """Apply loaded data to config object, keeping active_provider & llm_provider synced."""
         for key, value in data.items():
             if hasattr(self._config, key):
                 setattr(self._config, key, value)
+        
+        # Keep aliases synchronized
+        if "llm_provider" in data and "active_provider" not in data:
+            self._config.active_provider = data["llm_provider"]
+        elif "active_provider" in data and "llm_provider" not in data:
+            self._config.llm_provider = data["active_provider"]
+            
+        if "active_model" in data and "live_model" not in data:
+            self._config.live_model = data["active_model"]
+        elif "live_model" in data and "active_model" not in data:
+            self._config.active_model = data["live_model"]
     
     def save(self) -> bool:
         """Save current configuration to file."""
         try:
-            data = {
-                'active_provider': self._config.active_provider,
-                'active_model': self._config.active_model,
-                'model_assignments': self._config.model_assignments,
-                'theme': self._config.theme,
-                'language': self._config.language,
-                'voice_enabled': self._config.voice_enabled,
-                'speech_rate': self._config.speech_rate,
-                'memory_enabled': self._config.memory_enabled,
-                'context_depth': self._config.context_depth,
-                'auto_execution': self._config.auto_execution,
-                'confirmation_required': self._config.confirmation_required,
-                'vosk_model_path': self._config.vosk_model_path,
-                'assets_path': self._config.assets_path,
-                'debug_mode': self._config.debug_mode,
-                'log_level': self._config.log_level,
-            }
+            # Sync properties before saving
+            self._config.llm_provider = self._config.active_provider
+            self._config.live_model = self._config.active_model
+            
+            data = asdict(self._config)
             
             # Ensure directory exists
             self._config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -140,6 +200,16 @@ class ConfigManager:
         """Set configuration value and persist."""
         if hasattr(self._config, key):
             setattr(self._config, key, value)
+            # Sync aliases
+            if key == "active_provider":
+                self._config.llm_provider = value
+            elif key == "llm_provider":
+                self._config.active_provider = value
+            elif key == "active_model":
+                self._config.live_model = value
+            elif key == "live_model":
+                self._config.active_model = value
+                
             self.save()
     
     def get_model_for_task(self, task_type: str) -> Dict[str, str]:

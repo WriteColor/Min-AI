@@ -3,7 +3,7 @@ import uuid
 import time
 import os
 from datetime import datetime
-from actions.openrouter_agent import openrouter_agent
+from actions.utils.openrouter_agent import openrouter_agent
 
 class TaskPriority:
     LOW = 1

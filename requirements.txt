@@ -13,6 +13,8 @@ opencv-python
 numpy
 mss
 psutil
+qtawesome
+mediapipe
 comtypes
 pycaw
 win10toast
@@ -34,4 +36,4 @@ eventlet
 vosk
 tzdata
 openai>=1.0.0
-groq>=2.0.0
+groq>=2.0.0

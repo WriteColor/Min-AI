@@ -133,12 +133,20 @@ class MinUI:
         
         class HandshakeFilter(logging.Filter):
             def filter(self, record):
-                if record.msg == "opening handshake failed":
+                if record.msg in ("opening handshake failed", "connection handler failed"):
+                    return False
+                if record.exc_info and record.exc_info[0]:
+                    exc_name = record.exc_info[0].__name__
+                    if exc_name in ("InvalidMessage", "EOFError", "InvalidHandshake", "ConnectionClosed", "ConnectionClosedError", "ConnectionClosedOK"):
+                        return False
+                msg_str = str(record.msg)
+                if "handshake" in msg_str or "HTTP request" in msg_str or "connection closed" in msg_str:
                     return False
                 return True
 
         logging.getLogger("websockets.server").addFilter(HandshakeFilter())
-        logging.getLogger("websockets").setLevel(logging.ERROR)
+        logging.getLogger("websockets.protocol").addFilter(HandshakeFilter())
+        logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
         def get_active_media():
             import psutil
@@ -311,7 +319,7 @@ class MinUI:
 
                 # Send loaded config to Tauri client
                 try:
-                    cfg_path = Path(__file__).parent / "config" / "api_keys.json"
+                    cfg_path = Path(__file__).parent / "config" / "config.json"
                     if cfg_path.exists():
                         cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
                         
@@ -448,8 +456,8 @@ class MinUI:
                                     ar_path.write_text(json.dumps(app_registry_data, indent=4), encoding="utf-8")
                                     print("[WS] App registry saved.")
 
-                                # 5. Save the rest in api_keys.json
-                                cfg_path = cfg_dir / "api_keys.json"
+                                # 5. Save the rest in config.json
+                                cfg_path = cfg_dir / "config.json"
                                 if cfg_path.exists():
                                     cfg = json.loads(
                                         cfg_path.read_text(encoding="utf-8")
@@ -585,7 +593,7 @@ class MinUI:
                         elif msg_type == "list_models":
                             # Listar modelos disponibles de Gemini y OpenRouter
                             models = {"gemini": [], "openrouter": []}
-                            cfg_path = Path(__file__).parent / "config" / "api_keys.json"
+                            cfg_path = Path(__file__).parent / "config" / "config.json"
                             try:
                                 cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
                             except Exception:

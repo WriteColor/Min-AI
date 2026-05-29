@@ -10,6 +10,26 @@ import random
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from dataclasses import dataclass, field
+from enum import Enum
+
+
+class ToneType(Enum):
+    FORMAL = "formal"
+    INFORMAL = "informal"
+    TECHNICAL = "technical"
+    CASUAL = "casual"
+
+
+TASK_TONE_MAP = {
+    "code_generation": ToneType.TECHNICAL,
+    "general_reasoning": ToneType.INFORMAL,
+    "vision": ToneType.TECHNICAL,
+    "creative": ToneType.CASUAL,
+    "fast_response": ToneType.INFORMAL,
+    "long_context": ToneType.FORMAL,
+    "analytical": ToneType.TECHNICAL,
+    "image_generation": ToneType.CASUAL,
+}
 
 
 @dataclass
@@ -108,8 +128,57 @@ class PromptBuilder:
                 "Te veo ocupado.",
                 "Puedo esperar o volver mas tarde.",
                 "No hay apuro, estoy aqui."
+            ],
+            "tone_formal_acknowledgment": [
+                "Entendido, procedere en consecuencia.",
+                "Perfecto, hare lo necesario.",
+                "De acuerdo, ejecutare la tarea."
+            ],
+            "tone_formal_confirmation": [
+                "Desea que proceda con esta accion?",
+                "Confirmo que esta informacion es correcta?",
+                "Solicito confirmacion antes de continuar."
+            ],
+            "tone_formal_completion": [
+                "Tarea completada exitosamente.",
+                "Proceso finalizado correctamente.",
+                "Accion ejecutada con exito."
+            ],
+            "tone_technical_acknowledgment": [
+                "Recibido. Procesando solicitud.",
+                "OK. Ejecutando operacion.",
+                "Confirmado. Iniciando proceso."
+            ],
+            "tone_technical_confirmation": [
+                "Continuar con la ejecucion?",
+                "Confirmar parametros de entrada?",
+                "Ejecutar comando?"
+            ],
+            "tone_casual_acknowledgment": [
+                "Dale!", "Voy!", "Tomo!", "Ok!"
+            ],
+            "tone_casual_completion": [
+                "Listo!", "Hecho!", "Chao!", "Listo!"
             ]
         }
+    
+    def get_tone_for_task(self, task_type: str) -> ToneType:
+        """Get appropriate tone for a task type."""
+        if task_type in TASK_TONE_MAP:
+            return TASK_TONE_MAP[task_type]
+        return ToneType.INFORMAL
+    
+    def get_tone_variation(self, pool_base: str, tone: ToneType) -> str:
+        """Get a variation appropriate for the given tone."""
+        tone_pool_map = {
+            ToneType.FORMAL: f"tone_formal_{pool_base}",
+            ToneType.TECHNICAL: f"tone_technical_{pool_base}",
+            ToneType.INFORMAL: pool_base,
+            ToneType.CASUAL: f"tone_casual_{pool_base}",
+        }
+        pool_name = tone_pool_map.get(tone, pool_base)
+        pool = self._variation_pools.get(pool_name, self._variation_pools.get(pool_base, [""]))
+        return random.choice(pool) if pool else ""
     
     def set_system_prompt(self, prompt: str):
         """Set the base system prompt."""

@@ -63,7 +63,7 @@ MIN/
 │   ├── prompt.txt          # System prompt con sección de seguridad
 │   └── memory.json         # Memoria persistente del asistente
 ├── config/
-│   ├── api_keys.json       # Claves API (gitignored)
+│   ├── config.json       # Claves API (gitignored)
 │   ├── app_registry.json   # Caché de rutas de aplicaciones
 │   ├── favorites.json      # Sitios favoritos
 │   └── rules.json          # Reglas de automatización
@@ -145,7 +145,7 @@ MIN.bat help         # Mostrar ayuda
 
 ## ⚙️ Configuración
 
-La configuración se gestiona desde la UI (Settings → 5 pestañas) o editando `config/api_keys.json`:
+La configuración se gestiona desde la UI (Settings → 5 pestañas) o editando `config/config.json`:
 
 | Campo | Descripción |
 |-------|-----------|
