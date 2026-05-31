@@ -38,6 +38,8 @@ from .local_provider import LocalProvider
 from .openrouter_provider import OpenRouterProvider
 from .opencode_provider import OpenCodeProvider
 from .minimax_provider import MiniMaxProvider
+from .ollama_cloud_provider import OllamaCloudProvider
+from .nvidia_nim_provider import NvidiaNimProvider
 
 
 __all__ = [
@@ -70,6 +72,8 @@ __all__ = [
     "OpenRouterProvider",
     "OpenCodeProvider",
     "MiniMaxProvider",
+    "OllamaCloudProvider",
+    "NvidiaNimProvider",
 
     # Utilities
     "register_provider",

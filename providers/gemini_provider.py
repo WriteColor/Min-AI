@@ -141,12 +141,15 @@ class GeminiProvider(MultimodalProvider):
             raise RuntimeError("Provider not connected")
         
         try:
-            from google.generativeai import Audio
-            
-            audio_part = Audio(audio_data, mime_type=mime_type)
             response = await asyncio.to_thread(
                 self._client.generate_content,
-                [text_input, audio_part]
+                contents=[
+                    {
+                        "mime_type": mime_type,
+                        "data": audio_data
+                    },
+                    "Transcribir y responder a este audio."
+                ]
             )
             
             return response.text

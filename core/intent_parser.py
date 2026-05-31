@@ -88,6 +88,9 @@ class IntentPatterns:
     ]
     
     WINDOW_TITLE_PATTERN = r'the\s+window\s+["\']([^"\']+)["\']'
+    
+    # Simple math expressions: 5 + 5, 10 * (2 + 3)
+    MATH_PATTERN = r'\b(\d+(?:\.\d+)?\s*[\+\-\*\/\(\)]\s*)+\d+(?:\.\d+)?\b'
 
 
 class IntentParser:
@@ -121,6 +124,7 @@ class IntentParser:
             'copy': ['copy', 'duplicate', 'clone'],
             'move_file': ['move', 'relocate', 'transfer'],
             'rename': ['rename', 'rename to', 'change name'],
+            'calculate': ['calculate', 'compute', 'what is', 'how much is', '+', '-', '*', '/'],
         }
         self._intent_templates: Dict[str, str] = {}
         self._lock = threading.RLock()
@@ -255,6 +259,28 @@ class IntentParser:
                 start_pos=window_match.start(),
                 end_pos=window_match.end()
             ))
+            
+        # Extraer expresiones matemáticas
+        for match in re.finditer(IntentPatterns.MATH_PATTERN, text):
+            expr = match.group(0).strip()
+            # Validación robusta de sintaxis matemática
+            try:
+                # Usa eval de forma segura restringiendo el entorno a nada, para precedencia y cálculo seguro
+                import ast
+                # Validar que sea una expresión segura antes de evaluar
+                tree = ast.parse(expr, mode='eval')
+                valid_nodes = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.operator, ast.unaryop, ast.Num, ast.Constant)
+                if all(isinstance(node, valid_nodes) for node in ast.walk(tree)):
+                    val = eval(compile(tree, filename='', mode='eval'), {"__builtins__": None}, {})
+                    entities.append(IntentEntity(
+                        type='math_expression',
+                        value={'expression': expr, 'result': val},
+                        confidence=0.95,
+                        start_pos=match.start(),
+                        end_pos=match.end()
+                    ))
+            except Exception:
+                pass
         
         return entities
     
@@ -310,6 +336,9 @@ class IntentParser:
                     params['number'] = entity.value
             elif entity.type == 'filename':
                 params['filename'] = entity.value
+            elif entity.type == 'math_expression':
+                params['math_result'] = entity.value.get('result')
+                params['math_expression'] = entity.value.get('expression')
         
         return params
     

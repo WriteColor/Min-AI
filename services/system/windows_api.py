@@ -45,6 +45,32 @@ try:
 except ImportError:
     HAS_PYWINAUTO = False
 
+import ctypes
+from ctypes import cast, POINTER, c_void_p, c_int, c_float, c_ulong, byref
+
+CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
+IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
+IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
+IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
+IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
+IID_IAudioSessionEnumerator = ctypes.UUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}')
+IID_IPropertyStore = ctypes.UUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}')
+
+class IMMDeviceEnumerator(ctypes.Interface):
+    _iid_ = IID_IMMDeviceEnumerator
+
+class IMMDevice(ctypes.Interface):
+    _iid_ = IID_IMMDevice
+
+class IAudioSessionManager2(ctypes.Interface):
+    _iid_ = IID_IAudioSessionManager2
+
+class IAudioSessionControl(ctypes.Interface):
+    _iid_ = IID_IAudioSessionControl
+
+class IAudioSessionEnumerator(ctypes.Interface):
+    _iid_ = IID_IAudioSessionEnumerator
+
 
 class WindowState(Enum):
     UNKNOWN = "unknown"
@@ -239,7 +265,7 @@ class WindowsService:
         action_id = None
         if log_action:
             try:
-                from services.ui_action_logger import get_logger
+                from services.session.ui_action_logger import get_logger
                 win_info = self.get_window_info(hwnd)
                 action_id = get_logger().start_action(
                     action_type="restore_window",
@@ -273,7 +299,7 @@ class WindowsService:
 
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().capture_after_shot(action_id)
                     get_logger().end_action(
                         action_id,
@@ -289,7 +315,7 @@ class WindowsService:
             print(f"[WinService] restore_window error: {e}")
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().end_action(action_id, success=False, error=str(e))
                 except Exception:
                     pass
@@ -303,7 +329,7 @@ class WindowsService:
         action_id = None
         if log_action:
             try:
-                from services.ui_action_logger import get_logger
+                from services.session.ui_action_logger import get_logger
                 win_info = self.get_window_info(hwnd)
                 action_id = get_logger().start_action(
                     action_type="minimize_window",
@@ -334,7 +360,7 @@ class WindowsService:
 
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().capture_after_shot(action_id)
                     get_logger().end_action(action_id, success=success, verified=verified)
                 except Exception:
@@ -345,7 +371,7 @@ class WindowsService:
             print(f"[WinService] minimize_window error: {e}")
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().end_action(action_id, success=False, error=str(e))
                 except Exception:
                     pass
@@ -359,7 +385,7 @@ class WindowsService:
         action_id = None
         if log_action:
             try:
-                from services.ui_action_logger import get_logger
+                from services.session.ui_action_logger import get_logger
                 win_info = self.get_window_info(hwnd)
                 action_id = get_logger().start_action(
                     action_type="maximize_window",
@@ -390,7 +416,7 @@ class WindowsService:
 
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().capture_after_shot(action_id)
                     get_logger().end_action(action_id, success=success, verified=verified)
                 except Exception:
@@ -401,7 +427,7 @@ class WindowsService:
             print(f"[WinService] maximize_window error: {e}")
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().end_action(action_id, success=False, error=str(e))
                 except Exception:
                     pass
@@ -415,7 +441,7 @@ class WindowsService:
         action_id = None
         if log_action:
             try:
-                from services.ui_action_logger import get_logger
+                from services.session.ui_action_logger import get_logger
                 win_info = self.get_window_info(hwnd)
                 action_id = get_logger().start_action(
                     action_type="close_window",
@@ -431,7 +457,7 @@ class WindowsService:
             if not win32gui.IsWindow(hwnd):
                 if action_id:
                     try:
-                        from services.ui_action_logger import get_logger
+                        from services.session.ui_action_logger import get_logger
                         get_logger().end_action(action_id, success=False, error="Window already closed")
                     except Exception:
                         pass
@@ -452,7 +478,7 @@ class WindowsService:
 
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     if success:
                         get_logger().capture_after_shot(action_id)
                     get_logger().end_action(action_id, success=success, verified=verified)
@@ -464,7 +490,7 @@ class WindowsService:
             print(f"[WinService] close_window error: {e}")
             if action_id:
                 try:
-                    from services.ui_action_logger import get_logger
+                    from services.session.ui_action_logger import get_logger
                     get_logger().end_action(action_id, success=False, error=str(e))
                 except Exception:
                     pass
@@ -797,18 +823,6 @@ class WindowsService:
                 IID_IAudioSessionEnumerator = ctypes.UUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}')
                 IID_IPropertyStore = ctypes.UUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}')
                 
-                class IMMDeviceEnumerator(ctypes.Interface):
-                    _iid_ = IID_IMMDeviceEnumerator
-                
-                class IMMDevice(ctypes.Interface):
-                    _iid_ = IID_IMMDevice
-                
-                class IAudioSessionManager2(ctypes.Interface):
-                    _iid_ = IID_IAudioSessionManager2
-                
-                class IAudioSessionControl(ctypes.Interface):
-                    _iid_ = IID_IAudioSessionControl
-                
                 # Create device enumerator
                 enumerator = ctypes.cast(
                     ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
@@ -829,7 +843,6 @@ class WindowsService:
                 session_enum = ctypes.c_void_p()
                 session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))
                 
-                # Get IAudioSessionEnumerator
                 audio_enum = cast(session_enum, POINTER(IAudioSessionEnumerator))
                 
                 count = ctypes.c_int()

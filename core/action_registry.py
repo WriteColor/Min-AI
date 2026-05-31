@@ -404,6 +404,32 @@ BUILTIN_ACTIONS = [
         tags=["image", "generate", "create", "AI", "art"]
     ),
     ActionMetadata(
+        name="music_generation",
+        description="Generate original music with AI using MiniMax API",
+        category=ActionCategory.MEDIA,
+        priority=ActionPriority.NORMAL,
+        parameters=[
+            ActionParameter("prompt", str, True, description="Musical style/mood/genre description"),
+            ActionParameter("lyrics", str, False, None, "Song lyrics with [Verse], [Chorus] sections"),
+            ActionParameter("model", str, False, "music-2.6"),
+            ActionParameter("is_instrumental", bool, False, False),
+            ActionParameter("audio_url", str, False, None, "Reference audio URL for cover mode")
+        ],
+        examples=["Generate a synthwave electronic song", "Creame una canción con blues"],
+        tags=["music", "generate", "song", "audio", "minimax"]
+    ),
+    ActionMetadata(
+        name="music_lyrics_generation",
+        description="Generate song lyrics using AI with MiniMax API",
+        category=ActionCategory.MEDIA,
+        priority=ActionPriority.NORMAL,
+        parameters=[
+            ActionParameter("prompt", str, True, description="Theme/concept of the song")
+        ],
+        examples=["Generate lyrics about a rainy night", "Generame letras sobre amor"],
+        tags=["lyrics", "song", "music", "minimax"]
+    ),
+    ActionMetadata(
         name="take_screenshot",
         description="Take a screenshot of the screen or a region",
         category=ActionCategory.VISION,

@@ -18,7 +18,7 @@ from typing import Tuple, Optional, List, Any
 # Agregar el directorio raíz al path para imports
 sys.path.insert(0, r'C:\React-Nextjs-Projects\Jarvis AI')
 
-from services.windows_api import get_windows_service, WindowsService, WindowInfo, ProcessInfo
+from services.system.windows_api import get_windows_service, WindowsService, WindowInfo, ProcessInfo
 
 
 class TestResult:
@@ -199,7 +199,7 @@ class WindowsServiceTester:
         """Prueba: Verificar que el servicio se inicializa correctamente."""
         name = "Service Initialization"
         try:
-            from services.windows_api import _windows_service
+            from services.system.windows_api import _windows_service
             
             if _windows_service is None:
                 return TestResult(name=name, success=False, message="Singleton no inicializado")
@@ -223,7 +223,7 @@ class WindowsServiceTester:
     def test_has_pywinauto(self) -> TestResult:
         """Prueba: Verificar disponibilidad de pywinauto."""
         name = "pywinauto availability"
-        from services.windows_api import HAS_PYWINAUTO, HAS_WIN32, HAS_PSUTIL
+        from services.system.windows_api import HAS_PYWINAUTO, HAS_WIN32, HAS_PSUTIL
         
         return TestResult(
             name=name,

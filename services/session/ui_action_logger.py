@@ -78,7 +78,7 @@ class UIActionLogger:
         Returns the path to the saved screenshot.
         """
         try:
-            from services.windows_api import WindowsService
+            from services.system.windows_api import WindowsService
             ws = WindowsService()
             
             timestamp = datetime.now().strftime('%H%M%S')

@@ -12,7 +12,7 @@ from typing import Any, Dict, Callable
 
 # Load Windows service or fallback helpers
 try:
-    from services.windows_api import WindowsService, HAS_WIN32
+    from services.system.windows_api import WindowsService, HAS_WIN32
     _win_service = WindowsService()
 except ImportError:
     _win_service = None
@@ -28,7 +28,7 @@ try:
 except ImportError:
     gw = None
 
-CATEGORIES = ["automation", "files", "media", "system", "utils", "vision", "web"]
+CATEGORIES = ["automation", "files", "media", "music", "system", "utils", "vision", "web"]
 
 # Special function name or module mappings
 SPECIAL_MAPPINGS = {

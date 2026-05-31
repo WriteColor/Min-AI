@@ -54,7 +54,7 @@ def _capture_screen_base64() -> str:
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
         
         # Resize to save bandwidth
-        max_size = (1280, 720)
+        max_size = (800, 600)
         img.thumbnail(max_size, Image.Resampling.BILINEAR)
         
         buffer = io.BytesIO()
@@ -83,6 +83,20 @@ def _perform_vision_analysis() -> str:
 
     query = (
         "Eres el Guardián de Visión de JARVIS. Analiza esta captura de pantalla del usuario. "
+    )
+    
+    # Try to get active window for context
+    try:
+        import win32gui
+        hwnd = win32gui.GetForegroundWindow()
+        if hwnd:
+            active_title = win32gui.GetWindowText(hwnd)
+            if active_title:
+                query += f"La ventana activa actualmente es: '{active_title}'. "
+    except Exception:
+        pass
+        
+    query += (
         "Si encuentras un error crítico en una terminal, un aviso importante, un mensaje urgente de chat "
         "o si el usuario está claramente atascado o necesita ayuda contextual inmediata en lo que está haciendo, "
         "genera una sugerencia o aviso súper conciso, directo e inteligente en español de MÁXIMO 12 palabras. "
@@ -163,7 +177,7 @@ def _perform_vision_analysis() -> str:
         }
 
         payload = {
-            "model": "google/gemini-2.5-flash",
+            "model": "google/gemini-2.5-flash:free",
             "max_tokens": 150,
             "messages": [
                 {

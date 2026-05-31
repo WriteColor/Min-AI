@@ -22,9 +22,9 @@ def _get_api_key() -> str:
 def _get_model() -> str:
     try:
         data = json.loads(API_FILE.read_text(encoding="utf-8"))
-        return data.get("vision_model", "google/gemini-2.5-flash")
+        return data.get("vision_model", "google/gemini-2.5-flash:free")
     except Exception:
-        return "google/gemini-2.5-flash"
+        return "google/gemini-2.5-flash:free"
 
 
 def _capture_screen_base64() -> str:
@@ -39,7 +39,7 @@ def _capture_screen_base64() -> str:
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
         
         # Redimensionar si es muy grande para ahorrar tokens/ancho de banda
-        max_size = (1280, 720)
+        max_size = (800, 600)
         img.thumbnail(max_size, Image.Resampling.BILINEAR)
         
         # Guardar en buffer en memoria como JPEG

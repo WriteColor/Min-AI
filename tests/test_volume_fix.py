@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, '.')
 
-from services.windows_api import WindowsService
+from services.system.windows_api import WindowsService
 
 print("=== Testing Volume Control Fix ===\n")
 

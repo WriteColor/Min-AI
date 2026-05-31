@@ -1,44 +1,53 @@
-"""ui.py — MIN WebSocket UI Server for Tauri frontend."""
+"""
+ui.py — MIN WebSocket UI Server
+===============================
+Clean WebSocket server for Tauri frontend communication.
+Handles all UI events, config, media tracking, and client connections.
+"""
+
 from __future__ import annotations
-import sys
-import os
-import json
-import psutil
-import threading
+
 import asyncio
+import json
+import logging
+import os
+import psutil
+import sys
+import threading
+import uuid
+import webbrowser
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
 
+import websockets
 
-FAVORITES_PATH = Path(__file__).parent / "config" / "favorites.json"
+# ── Constants ────────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_DIR = BASE_DIR / "config"
+FAVORITES_PATH = CONFIG_DIR / "favorites.json"
 
-
+# ── Favorites Helpers ───────────────────────────────────────────────────────
 def load_favorites() -> list:
     if not FAVORITES_PATH.exists():
-        default_favs = [
-            {"title": "Noticias", "url": "https://news.google.com"},
-            {"title": "TradingView", "url": "https://www.tradingview.com"},
-            {"title": "GitHub", "url": "https://github.com"},
-        ]
-        save_favorites(default_favs)
-        return default_favs
+        return []
     try:
         return json.loads(FAVORITES_PATH.read_text(encoding="utf-8"))
     except Exception:
         return []
 
-
 def save_favorites(favs_list: list):
     try:
-        FAVORITES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         FAVORITES_PATH.write_text(
-            json.dumps(favs_list, indent=2, ensure_ascii=False), encoding="utf-8"
+            json.dumps(favs_list, indent=2, ensure_ascii=False),
+            encoding="utf-8"
         )
     except Exception as e:
-        print(f"[Favorites] Error saving favorites: {e}")
+        print(f"[Favorites] Error: {e}")
 
-
+# ── Mock Tauri Root ─────────────────────────────────────────────────────────
 class MockRootTauri:
+    """Fake root for Tkinter-like mainloop compatibility."""
     def __init__(self, ui):
         self.ui = ui
 
@@ -57,32 +66,64 @@ class MockRootTauri:
         t.daemon = True
         t.start()
 
+# ── WebSocket Log Filter ───────────────────────────────────────────────────
+class _WSLogFilter(logging.Filter):
+    def filter(self, record):
+        msgs = (
+            "opening handshake failed",
+            "connection handler failed",
+            "handshake",
+            "HTTP request",
+            "connection closed",
+        )
+        msg_str = str(record.msg)
+        if any(m in msg_str for m in msgs):
+            return False
+        if record.exc_info and record.exc_info[0]:
+            from websockets.exceptions import (
+                InvalidMessage, EOFError, InvalidHandshake,
+                ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
+            )
+            if record.exc_info[0] in (
+                InvalidMessage, EOFError, InvalidHandshake,
+                ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
+            ):
+                return False
+        return True
 
+# ── MinUI ────────────────────────────────────────────────────────────────────
 class MinUI:
     def __init__(self, face_path=""):
         self.muted = False
         self.current_file = ""
 
+        # Callbacks (set by main.py)
         self.on_text_command = None
         self.on_stop_command = None
         self.on_config_saved = None
 
+        # Response buffer
         self.min_response_buffer = ""
 
+        # Connected WebSocket clients
         self._clients: set = set()
         self._ws_loop = None
+
+        # Gesture thread handle
+        self._gesture_thread = None
+
         self.root = MockRootTauri(self)
         print("[MIN] Running in Headless WebSocket mode for Tauri.")
 
-        # Run startup shortcut setup in background thread
         threading.Thread(target=self.ensure_startup_shortcut, daemon=True).start()
+
+    # ── Basic UI Methods ─────────────────────────────────────────────────
 
     def wait_for_api_key(self):
         pass
 
     def write_log(self, text: str):
-        # Dedup: no reenviar si el último log es idéntico
-        if hasattr(self, '_last_log') and self._last_log == text:
+        if hasattr(self, "_last_log") and self._last_log == text:
             return
         self._last_log = text
         print(text)
@@ -90,7 +131,6 @@ class MinUI:
 
     def set_state(self, state: str):
         self.broadcast({"type": "state", "value": state})
-
         if state == "MUTED":
             self.muted = True
         elif state in ("LISTENING", "SPEAKING", "THINKING"):
@@ -111,588 +151,63 @@ class MinUI:
                 self.min_response_buffer += " " + text
             else:
                 self.min_response_buffer = text
-
-            # Enviar el chunk como log unificado (no palabra por palabra)
             self.broadcast({"type": "log", "value": "MIN: " + text})
 
     def show_weather_widget(self):
         try:
-            from actions.weather_report import fetch_weather_data
-
+            from actions.automation.weather_report import fetch_weather_data
             data = fetch_weather_data({})
             if not data.get("error"):
                 self.broadcast({"type": "weather", "data": data})
         except Exception:
             pass
 
+    # ── WebSocket Server ─────────────────────────────────────────────────
+
     async def _run_ws_server(self):
-        import websockets
-        import json
-        import asyncio
-        import logging
-        
-        class HandshakeFilter(logging.Filter):
-            def filter(self, record):
-                if record.msg in ("opening handshake failed", "connection handler failed"):
-                    return False
-                if record.exc_info and record.exc_info[0]:
-                    exc_name = record.exc_info[0].__name__
-                    if exc_name in ("InvalidMessage", "EOFError", "InvalidHandshake", "ConnectionClosed", "ConnectionClosedError", "ConnectionClosedOK"):
-                        return False
-                msg_str = str(record.msg)
-                if "handshake" in msg_str or "HTTP request" in msg_str or "connection closed" in msg_str:
-                    return False
-                return True
+        # Suppress noisy websockets logs
+        ws_logger = logging.getLogger("websockets")
+        ws_logger.addFilter(_WSLogFilter())
+        ws_logger.setLevel(logging.CRITICAL)
 
-        logging.getLogger("websockets.server").addFilter(HandshakeFilter())
-        logging.getLogger("websockets.protocol").addFilter(HandshakeFilter())
-        logging.getLogger("websockets").setLevel(logging.CRITICAL)
-
-        def get_active_media():
-            import psutil
-
-            try:
-                import win32gui
-                import win32process
-            except ImportError:
-                return {"app": "Ninguno", "title": "Sin reproducción", "artist": ""}
-
-            try:
-                pids_by_name = {}
-                for proc in psutil.process_iter(["pid", "name"]):
-                    try:
-                        name = proc.info["name"]
-                        if name:
-                            name_lower = name.lower()
-                            if name_lower not in pids_by_name:
-                                pids_by_name[name_lower] = []
-                            pids_by_name[name_lower].append(proc.info["pid"])
-                    except Exception:
-                        pass
-
-                visible_windows = []
-
-                def enum_windows_callback(hwnd, extra):
-                    if win32gui.IsWindowVisible(hwnd):
-                        _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                        title = win32gui.GetWindowText(hwnd)
-                        if title:
-                            visible_windows.append((title, pid, hwnd))
-                    return True
-
-                win32gui.EnumWindows(enum_windows_callback, None)
-
-                # 1. Spotify
-                spotify_pids = pids_by_name.get("spotify.exe", [])
-                if spotify_pids:
-                    for title, pid, hwnd in visible_windows:
-                        if pid in spotify_pids:
-                            if title not in [
-                                "Spotify",
-                                "Spotify Premium",
-                                "Spotify Free",
-                                "Spotify Partner Store",
-                                "Spotify helper",
-                                "SpotifyOverlay",
-                            ]:
-                                if " - " in title:
-                                    parts = title.split(" - ", 1)
-                                    return {
-                                        "app": "Spotify",
-                                        "artist": parts[0],
-                                        "title": parts[1],
-                                    }
-                                return {"app": "Spotify", "artist": "", "title": title}
-                    for title, pid, hwnd in visible_windows:
-                        if pid in spotify_pids and title in [
-                            "Spotify",
-                            "Spotify Premium",
-                            "Spotify Free",
-                        ]:
-                            return {
-                                "app": "Spotify",
-                                "artist": "Pausado",
-                                "title": "Spotify",
-                            }
-
-                # 2. VLC
-                vlc_pids = pids_by_name.get("vlc.exe", [])
-                if vlc_pids:
-                    for title, pid, hwnd in visible_windows:
-                        if pid in vlc_pids:
-                            if " - VLC media player" in title:
-                                clean_title = title.replace(
-                                    " - VLC media player", ""
-                                )
-                                if " - " in clean_title:
-                                    parts = clean_title.split(" - ", 1)
-                                    return {
-                                        "app": "VLC Media Player",
-                                        "artist": parts[0],
-                                        "title": parts[1],
-                                    }
-                                return {
-                                    "app": "VLC Media Player",
-                                    "artist": "",
-                                    "title": clean_title,
-                                }
-
-                # 3. Web Browsers
-                browser_process_names = [
-                    "chrome.exe",
-                    "brave.exe",
-                    "firefox.exe",
-                    "msedge.exe",
-                    "opera.exe",
-                ]
-                for browser_name in browser_process_names:
-                    browser_pids = pids_by_name.get(browser_name, [])
-                    if browser_pids:
-                        for title, pid, hwnd in visible_windows:
-                            if pid in browser_pids:
-                                if " - YouTube" in title:
-                                    clean_title = title.split(" - YouTube")[0]
-                                    artist = "YouTube"
-                                    if " - " in clean_title:
-                                        parts = clean_title.split(" - ", 1)
-                                        artist = parts[0]
-                                        clean_title = parts[1]
-                                    return {
-                                        "app": browser_name.replace(".exe", "").capitalize(),
-                                        "artist": artist,
-                                        "title": clean_title,
-                                    }
-                                elif "Netflix" in title:
-                                    return {
-                                        "app": "Netflix",
-                                        "artist": "Netflix",
-                                        "title": title.split(" - ")[0],
-                                    }
-                                elif "SoundCloud" in title:
-                                    return {
-                                        "app": "SoundCloud",
-                                        "artist": "SoundCloud",
-                                        "title": title.split(" - ")[0],
-                                    }
-
-                # 4. Modern Windows Media Player
-                wmp_pids = pids_by_name.get(
-                    "microsoft.media.player.exe", []
-                ) or pids_by_name.get("wmplayer.exe", [])
-                if wmp_pids:
-                    for title, pid, hwnd in visible_windows:
-                        if pid in wmp_pids:
-                            if title and title not in [
-                                "Media Player",
-                                "Reproductor de multimedia",
-                            ]:
-                                if " - " in title:
-                                    parts = title.split(" - ", 1)
-                                    return {
-                                        "app": "Windows Media Player",
-                                        "artist": parts[0],
-                                        "title": parts[1],
-                                    }
-                                return {
-                                    "app": "Windows Media Player",
-                                    "artist": "",
-                                    "title": title,
-                                }
-
-                return {"app": "Ninguno", "title": "Sin reproducción", "artist": ""}
-            except Exception:
-                return {"app": "Ninguno", "title": "Sin reproducción", "artist": ""}
+        from services.system.media_monitor import get_active_media
 
         async def handler(websocket):
-            print(f"[WS] Client connected from {websocket.remote_address}")
+            addr = websocket.remote_address
+            print(f"[WS] Client connected from {addr}")
             self._clients.add(websocket)
+
             try:
-                # Send current state upon connection
-                await websocket.send(
-                    json.dumps(
-                        {
-                            "type": "state",
-                            "value": "MUTED" if self.muted else "LISTENING",
-                        }
-                    )
-                )
+                # Send current state
+                await websocket.send(json.dumps({
+                    "type": "state",
+                    "value": "MUTED" if self.muted else "LISTENING"
+                }))
 
-                # Send loaded config to Tauri client
-                try:
-                    cfg_path = Path(__file__).parent / "config" / "config.json"
-                    if cfg_path.exists():
-                        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-                        
-                        # Load accessibility config
-                        acc_path = Path(__file__).parent / "config" / "accessibility_config.json"
-                        if acc_path.exists():
-                            try:
-                                cfg["accessibility"] = json.loads(acc_path.read_text(encoding="utf-8"))
-                            except Exception as _ae:
-                                print(f"[WS] Error loading accessibility: {_ae}")
-                        
-                        # Load vision guardian state
-                        vg_path = Path(__file__).parent / "config" / "vision_guardian_state.json"
-                        if vg_path.exists():
-                            try:
-                                cfg["vision_guardian"] = json.loads(vg_path.read_text(encoding="utf-8"))
-                            except Exception as _ve:
-                                print(f"[WS] Error loading vision_guardian: {_ve}")
-                        
-                        # Load user profile
-                        up_path = Path(__file__).parent / "config" / "user_profile.json"
-                        if up_path.exists():
-                            try:
-                                cfg["user_profile"] = json.loads(up_path.read_text(encoding="utf-8"))
-                            except Exception as _upe:
-                                print(f"[WS] Error loading user_profile: {_upe}")
+                # Send full config to new client
+                await self._send_config(websocket)
 
-                        # Load app registry
-                        ar_path = Path(__file__).parent / "config" / "app_registry.json"
-                        if ar_path.exists():
-                            try:
-                                cfg["app_registry"] = json.loads(ar_path.read_text(encoding="utf-8"))
-                            except Exception as _are:
-                                print(f"[WS] Error loading app_registry: {_are}")
+                # Send weather
+                await self._send_weather(websocket)
 
-                        cfg_text = json.dumps(cfg)
-                        await websocket.send(
-                            json.dumps(
-                                {
-                                    "type": "log",
-                                    "value": f"config_loaded:{cfg_text}",
-                                }
-                            )
-                        )
-                except Exception as e:
-                    print(f"[WS] Error loading initial config: {e}")
+                # Send todos
+                await self._send_todos(websocket)
 
-                # Send initial weather if available
-                try:
-                    from actions.weather_report import fetch_weather_data
+                # Send favorites
+                await websocket.send(json.dumps({
+                    "type": "favorites",
+                    "value": load_favorites()
+                }))
 
-                    data = fetch_weather_data({})
-                    if not data.get("error"):
-                        await websocket.send(
-                            json.dumps({"type": "weather", "data": data})
-                        )
-                except Exception:
-                    pass
-
-                # Send initial todos
-                try:
-                    from actions.goals import load_goals
-
-                    await websocket.send(
-                        json.dumps({"type": "todos", "value": load_goals()})
-                    )
-                except Exception as e:
-                    print(f"[WS] Error loading initial goals: {e}")
-
-                # Send initial favorites
-                try:
-                    await websocket.send(
-                        json.dumps({"type": "favorites", "value": load_favorites()})
-                    )
-                except Exception as e:
-                    print(f"[WS] Error loading initial favorites: {e}")
-
-                # Read messages
+                # Message loop
                 async for message in websocket:
-                    try:
-                        data = json.loads(message)
-                        msg_type = data.get("type")
-                        if msg_type == "command":
-                            val = data.get("value", "")
-                            if self.on_text_command:
-                                self.on_text_command(val)
-                        elif msg_type == "toggle_mute":
-                            self.muted = not self.muted
-                            self.broadcast(
-                                {
-                                    "type": "state",
-                                    "value": "MUTED" if self.muted else "LISTENING",
-                                }
-                            )
-                        elif msg_type == "media_control":
-                            action = data.get("action", "")
-                            try:
-                                from actions.media_control import media_control
+                    await self._handle_message(websocket, message)
 
-                                res = media_control({"action": action})
-                                self.write_log(f"SYS: Control de Medios: {res}")
-                            except Exception as e:
-                                print(f"[WS] Media control error: {e}")
-                        elif msg_type == "save_config":
-                            config_data = data.get("config", {})
-                            try:
-                                cfg_dir = Path(__file__).parent / "config"
-                                
-                                # 1. Extract and save accessibility_config
-                                if "accessibility" in config_data:
-                                    accessibility_data = config_data.pop("accessibility")
-                                    acc_path = cfg_dir / "accessibility_config.json"
-                                    acc_path.write_text(json.dumps(accessibility_data, indent=4), encoding="utf-8")
-                                    print("[WS] Accessibility config saved.")
-
-                                # 2. Extract and save vision_guardian
-                                if "vision_guardian" in config_data:
-                                    vision_guardian_data = config_data.pop("vision_guardian")
-                                    vg_path = cfg_dir / "vision_guardian_state.json"
-                                    vg_path.write_text(json.dumps(vision_guardian_data, indent=4), encoding="utf-8")
-                                    print("[WS] Vision guardian state saved.")
-
-                                # 3. Extract and save user_profile
-                                if "user_profile" in config_data:
-                                    user_profile_data = config_data.pop("user_profile")
-                                    up_path = cfg_dir / "user_profile.json"
-                                    up_path.write_text(json.dumps(user_profile_data, indent=4), encoding="utf-8")
-                                    print("[WS] User profile saved.")
-
-                                # 4. Extract and save app_registry
-                                if "app_registry" in config_data:
-                                    app_registry_data = config_data.pop("app_registry")
-                                    ar_path = cfg_dir / "app_registry.json"
-                                    ar_path.write_text(json.dumps(app_registry_data, indent=4), encoding="utf-8")
-                                    print("[WS] App registry saved.")
-
-                                # 5. Save the rest in config.json
-                                cfg_path = cfg_dir / "config.json"
-                                if cfg_path.exists():
-                                    cfg = json.loads(
-                                        cfg_path.read_text(encoding="utf-8")
-                                    )
-                                    cfg.update(config_data)
-                                    cfg_path.write_text(
-                                        json.dumps(cfg, indent=4), encoding="utf-8"
-                                    )
-                                    print(
-                                        f"[WS] Config saved successfully to {cfg_path}"
-                                    )
-                            except Exception as e:
-                                print(f"[WS] Error saving config files: {e}")
-
-                            if self.on_config_saved:
-                                self.on_config_saved(config_data)
-                        elif msg_type == "set_file":
-                            path_val = data.get("value", "").strip()
-                            self.current_file = path_val
-                            self.write_log(f"SYS: Archivo cargado en el kernel: {self.current_file}")
-                        elif msg_type == "get_todos":
-                            from actions.goals import load_goals
-
-                            await websocket.send(
-                                json.dumps({"type": "todos", "value": load_goals()})
-                            )
-                        elif msg_type == "add_todo":
-                            from actions.goals import load_goals, save_goals
-                            import uuid
-
-                            title = data.get("title", "").strip()
-                            priority = data.get("priority", "medium").lower()
-                            if title:
-                                gls = load_goals()
-                                gls.append(
-                                    {
-                                        "id": str(uuid.uuid4()),
-                                        "title": title,
-                                        "description": data.get(
-                                            "description", ""
-                                        ).strip(),
-                                        "priority": priority
-                                        if priority in ("high", "medium", "low")
-                                        else "medium",
-                                        "due_date": data.get("due_date", "").strip(),
-                                        "status": "pending",
-                                        "subtasks": [],
-                                        "created_at": datetime.now().isoformat(),
-                                        "completed_at": None,
-                                    }
-                                )
-                                save_goals(gls)
-                                self.broadcast({"type": "todos", "value": gls})
-                        elif msg_type == "toggle_todo":
-                            from actions.goals import load_goals, save_goals
-
-                            todo_id = data.get("id", "")
-                            gls = load_goals()
-                            for g in gls:
-                                if g["id"] == todo_id:
-                                    g["status"] = (
-                                        "completed"
-                                        if g["status"] == "pending"
-                                        else "pending"
-                                    )
-                                    if g["status"] == "completed":
-                                        g[
-                                            "completed_at"
-                                        ] = datetime.now().isoformat()
-                                        for s in g.get("subtasks", []):
-                                            s["status"] = "completed"
-                                    else:
-                                        g["completed_at"] = None
-                                    break
-                            save_goals(gls)
-                            self.broadcast({"type": "todos", "value": gls})
-                        elif msg_type == "delete_todo":
-                            from actions.goals import load_goals, save_goals
-
-                            todo_id = data.get("id", "")
-                            gls = load_goals()
-                            gls = [g for g in gls if g["id"] != todo_id]
-                            save_goals(gls)
-                            self.broadcast({"type": "todos", "value": gls})
-                        elif msg_type == "get_favorites":
-                            await websocket.send(
-                                json.dumps(
-                                    {"type": "favorites", "value": load_favorites()}
-                                )
-                            )
-                        elif msg_type == "add_favorite":
-                            title = data.get("title", "").strip()
-                            url = data.get("url", "").strip()
-                            if title and url:
-                                favs = load_favorites()
-                                favs.append({"title": title, "url": url})
-                                save_favorites(favs)
-                                self.broadcast({"type": "favorites", "value": favs})
-                        elif msg_type == "delete_favorite":
-                            url = data.get("url", "")
-                            favs = load_favorites()
-                            favs = [f for f in favs if f["url"] != url]
-                            save_favorites(favs)
-                            self.broadcast({"type": "favorites", "value": favs})
-                        elif msg_type == "open_url":
-                            url = data.get("url", "")
-                            if url:
-                                import webbrowser
-
-                                webbrowser.open(url)
-                        elif msg_type == "list_audio_devices":
-                            # Listar dispositivos de audio (micrófono y speakers) disponibles
-                            devices = {"microphones": [], "speakers": []}
-                            try:
-                                import pyaudio
-                                pa = pyaudio.PyAudio()
-                                for i in range(pa.get_device_count()):
-                                    info = pa.get_device_info_by_index(i)
-                                    dev_entry = {
-                                        "index": i,
-                                        "name": info.get("name", f"Device {i}"),
-                                        "channels_in": info.get("maxInputChannels", 0),
-                                        "channels_out": info.get("maxOutputChannels", 0),
-                                    }
-                                    if info.get("maxInputChannels", 0) > 0:
-                                        devices["microphones"].append(dev_entry)
-                                    if info.get("maxOutputChannels", 0) > 0:
-                                        devices["speakers"].append(dev_entry)
-                                pa.terminate()
-                            except Exception as e:
-                                print(f"[WS] Error listing audio devices: {e}")
-                            await websocket.send(json.dumps({"type": "audio_devices", "data": devices}))
-                        elif msg_type == "list_models":
-                            # Listar modelos disponibles de Gemini y OpenRouter
-                            models = {"gemini": [], "openrouter": []}
-                            cfg_path = Path(__file__).parent / "config" / "config.json"
-                            try:
-                                cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
-                            except Exception:
-                                cfg = {}
-                            # Gemini models
-                            gemini_key = cfg.get("gemini_api_key", "")
-                            if gemini_key:
-                                try:
-                                    import urllib.request
-                                    req = urllib.request.Request(
-                                        f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}",
-                                        headers={"User-Agent": "MIN/2.0"}
-                                    )
-                                    resp = urllib.request.urlopen(req, timeout=10)
-                                    data_resp = json.loads(resp.read().decode("utf-8"))
-                                    for m in data_resp.get("models", []):
-                                        models["gemini"].append({
-                                            "id": m.get("name", ""),
-                                            "name": m.get("displayName", m.get("name", "")),
-                                            "description": m.get("description", ""),
-                                        })
-                                except Exception as e:
-                                    print(f"[WS] Error listing Gemini models: {e}")
-                            # OpenRouter models
-                            or_key = cfg.get("openrouter_api_key", "")
-                            if or_key:
-                                try:
-                                    import urllib.request
-                                    req = urllib.request.Request(
-                                        "https://openrouter.ai/api/v1/models",
-                                        headers={"Authorization": f"Bearer {or_key}", "User-Agent": "MIN/2.0"}
-                                    )
-                                    resp = urllib.request.urlopen(req, timeout=10)
-                                    data_resp = json.loads(resp.read().decode("utf-8"))
-                                    for m in data_resp.get("data", []):
-                                        models["openrouter"].append({
-                                            "id": m.get("id", ""),
-                                            "name": m.get("name", m.get("id", "")),
-                                            "context_length": m.get("context_length", 0),
-                                        })
-                                except Exception as e:
-                                    print(f"[WS] Error listing OpenRouter models: {e}")
-                            await websocket.send(json.dumps({"type": "models_list", "data": models}))
-                        elif msg_type == "agent_status":
-                            # Devolver estado de la instancia del agente
-                            import os
-                            status_info = {
-                                "pid": os.getpid(),
-                                "uptime_seconds": 0,
-                                "memory_mb": 0,
-                                "python_version": sys.version,
-                            }
-                            try:
-                                proc = psutil.Process(os.getpid())
-                                status_info["memory_mb"] = round(proc.memory_info().rss / 1024 / 1024, 1)
-                                status_info["uptime_seconds"] = round((datetime.now() - datetime.fromtimestamp(proc.create_time())).total_seconds())
-                            except Exception:
-                                pass
-                            await websocket.send(json.dumps({"type": "agent_status", "data": status_info}))
-                        elif msg_type == "agent_kill":
-                            # Kill forzado de la instancia del agente
-                            self.broadcast({"type": "log", "value": "SYS: Apagando instancia de MIN..."})
-                            self.broadcast({"type": "ui_control", "action": "shutdown"})
-                            import os
-                            os._exit(0)
-                        elif msg_type == "agent_restart":
-                            # Reinicio completo: lanza nuevo proceso y termina este
-                            self.broadcast({"type": "log", "value": "SYS: Reiniciando MIN..."})
-                            try:
-                                import subprocess
-                                main_py = str(Path(__file__).parent / "main.py")
-                                subprocess.Popen([sys.executable, main_py], creationflags=0x00000008)  # DETACHED_PROCESS
-                            except Exception as e:
-                                print(f"[WS] Error restarting: {e}")
-                            import os
-                            os._exit(0)
-                        elif msg_type == "list_browsers":
-                            # Listar navegadores detectados
-                            try:
-                                from actions.browser_registry import detect_installed_browsers, resolve_browser_path
-                                detected = detect_installed_browsers()
-                                current_key, current_path = resolve_browser_path()
-                                await websocket.send(json.dumps({
-                                    "type": "browsers_list",
-                                    "data": {
-                                        "installed": {k: v for k, v in detected.items()},
-                                        "current": current_key,
-                                        "current_path": current_path or "",
-                                    }
-                                }))
-                            except Exception as e:
-                                print(f"[WS] Error listing browsers: {e}")
-                    except Exception as e:
-                        print(f"[WS] Error parsing client message: {e}")
             except websockets.exceptions.ConnectionClosed:
                 pass
             finally:
-                self._clients.remove(websocket)
-                print("[WS] Client disconnected")
+                self._clients.discard(websocket)
+                print(f"[WS] Client disconnected: {addr}")
 
         async def media_tracker():
             last_media = None
@@ -702,44 +217,384 @@ class MinUI:
                         media = get_active_media()
                         if media != last_media:
                             last_media = media
-                            self.broadcast(
-                                {
-                                    "type": "media",
-                                    "app": media["app"],
-                                    "title": media["title"],
-                                    "artist": media["artist"],
-                                }
-                            )
+                            self.broadcast({
+                                "type": "media",
+                                "app": media["app"],
+                                "title": media["title"],
+                                "artist": media["artist"],
+                            })
                 except Exception as e:
-                    print(f"[WS Media] Error in tracker loop: {e}")
+                    print(f"[WS Media] Tracker error: {e}")
                 await asyncio.sleep(2.0)
 
-        # Run tracker in background
         asyncio.create_task(media_tracker())
 
+        print("[WS] Server running at ws://127.0.0.1:8765")
         async with websockets.serve(handler, "127.0.0.1", 8765):
-            print("[WS] Server running at ws://127.0.0.1:8765")
             await asyncio.Future()
+
+    async def _send_config(self, websocket):
+        """Send full config to newly connected client."""
+        try:
+            cfg_path = CONFIG_DIR / "config.json"
+            if cfg_path.exists():
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+
+                # Merge sub-configs into cfg dict
+                sub_configs = [
+                    ("accessibility", "accessibility_config.json"),
+                    ("vision_guardian", "vision_guardian_state.json"),
+                    ("user_profile", "user_profile.json"),
+                    ("app_registry", "app_registry.json"),
+                ]
+                for key, filename in sub_configs:
+                    path = CONFIG_DIR / filename
+                    if path.exists():
+                        try:
+                            cfg[key] = json.loads(path.read_text(encoding="utf-8"))
+                        except Exception:
+                            pass
+
+                await websocket.send(json.dumps({
+                    "type": "log",
+                    "value": f"config_loaded:{json.dumps(cfg)}"
+                }))
+        except Exception as e:
+            print(f"[WS] Config send error: {e}")
+
+    async def _send_weather(self, websocket):
+        """Send weather data to newly connected client."""
+        try:
+            from actions.automation.weather_report import fetch_weather_data
+            data = fetch_weather_data({})
+            if not data.get("error"):
+                await websocket.send(json.dumps({"type": "weather", "data": data}))
+        except Exception:
+            pass
+
+    async def _send_todos(self, websocket):
+        """Send todos to newly connected client."""
+        try:
+            from actions.automation.goals import load_goals
+            await websocket.send(json.dumps({"type": "todos", "value": load_goals()}))
+        except Exception as e:
+            print(f"[WS] Todos send error: {e}")
+
+    async def _handle_message(self, websocket, message):
+        """Handle incoming WebSocket message from Tauri client."""
+        try:
+            data = json.loads(message)
+            msg_type = data.get("type", "")
+
+            if msg_type == "command":
+                val = data.get("value", "")
+                if self.on_text_command:
+                    self.on_text_command(val)
+
+            elif msg_type == "toggle_mute":
+                self.muted = not self.muted
+                self.broadcast({
+                    "type": "state",
+                    "value": "MUTED" if self.muted else "LISTENING"
+                })
+
+            elif msg_type == "toggle_camera_gestures":
+                self._toggle_camera_gestures()
+
+            elif msg_type == "media_control":
+                action = data.get("action", "")
+                try:
+                    from actions.media.media_control import media_control
+                    res = media_control({"action": action})
+                    self.write_log(f"SYS: Control de Medios: {res}")
+                except Exception as e:
+                    print(f"[WS] Media control error: {e}")
+
+            elif msg_type == "save_config":
+                await self._handle_save_config(data.get("config", {}))
+
+            elif msg_type == "set_file":
+                path_val = data.get("value", "").strip()
+                self.current_file = path_val
+                self.write_log(f"SYS: Archivo cargado: {self.current_file}")
+
+            elif msg_type == "get_todos":
+                from actions.automation.goals import load_goals
+                await websocket.send(json.dumps({
+                    "type": "todos",
+                    "value": load_goals()
+                }))
+
+            elif msg_type == "add_todo":
+                await self._handle_add_todo(data)
+
+            elif msg_type == "toggle_todo":
+                await self._handle_toggle_todo(data)
+
+            elif msg_type == "delete_todo":
+                await self._handle_delete_todo(data)
+
+            elif msg_type == "get_favorites":
+                await websocket.send(json.dumps({
+                    "type": "favorites",
+                    "value": load_favorites()
+                }))
+
+            elif msg_type == "add_favorite":
+                title = data.get("title", "").strip()
+                url = data.get("url", "").strip()
+                if title and url:
+                    favs = load_favorites()
+                    favs.append({"title": title, "url": url})
+                    save_favorites(favs)
+                    self.broadcast({"type": "favorites", "value": favs})
+
+            elif msg_type == "delete_favorite":
+                url = data.get("url", "")
+                favs = load_favorites()
+                favs = [f for f in favs if f["url"] != url]
+                save_favorites(favs)
+                self.broadcast({"type": "favorites", "value": favs})
+
+            elif msg_type == "open_url":
+                url = data.get("url", "")
+                if url:
+                    webbrowser.open(url)
+
+            elif msg_type == "list_audio_devices":
+                await self._handle_list_audio_devices(websocket)
+
+            elif msg_type == "list_models":
+                await self._handle_list_models(websocket)
+
+            elif msg_type == "agent_status":
+                await self._handle_agent_status(websocket)
+
+            elif msg_type == "agent_kill":
+                self.stop_gesture_thread()
+                self.broadcast({"type": "log", "value": "SYS: Apagando MIN..."})
+                self.broadcast({"type": "ui_control", "action": "shutdown"})
+                os._exit(0)
+
+            elif msg_type == "agent_restart":
+                self.stop_gesture_thread()
+                self.broadcast({"type": "log", "value": "SYS: Reiniciando MIN..."})
+                try:
+                    main_py = str(BASE_DIR / "main.py")
+                    subprocess.Popen(
+                        [sys.executable, main_py],
+                        creationflags=0x00000008
+                    )
+                except Exception as e:
+                    print(f"[WS] Restart error: {e}")
+                os._exit(0)
+
+            elif msg_type == "list_browsers":
+                await self._handle_list_browsers(websocket)
+
+        except Exception as e:
+            print(f"[WS] Message handling error: {e}")
+
+    async def _handle_save_config(self, config_data: dict):
+        """Save config and sub-configs from UI."""
+        try:
+            # Extract and save sub-configs
+            sub_configs = [
+                ("accessibility", "accessibility_config.json"),
+                ("vision_guardian", "vision_guardian_state.json"),
+                ("user_profile", "user_profile.json"),
+                ("app_registry", "app_registry.json"),
+            ]
+            for key, filename in sub_configs:
+                if key in config_data:
+                    path = CONFIG_DIR / filename
+                    path.write_text(
+                        json.dumps(config_data.pop(key), indent=4),
+                        encoding="utf-8"
+                    )
+
+            # Save remaining config
+            cfg_path = CONFIG_DIR / "config.json"
+            if cfg_path.exists():
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                cfg.update(config_data)
+                cfg_path.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+
+            if self.on_config_saved:
+                self.on_config_saved(config_data)
+
+        except Exception as e:
+            print(f"[WS] Config save error: {e}")
+
+    async def _handle_add_todo(self, data: dict):
+        from actions.automation.goals import load_goals, save_goals
+        title = data.get("title", "").strip()
+        priority = data.get("priority", "medium").lower()
+        if title:
+            gls = load_goals()
+            gls.append({
+                "id": str(uuid.uuid4()),
+                "title": title,
+                "description": data.get("description", "").strip(),
+                "priority": priority if priority in ("high", "medium", "low") else "medium",
+                "due_date": data.get("due_date", "").strip(),
+                "status": "pending",
+                "subtasks": [],
+                "created_at": datetime.now().isoformat(),
+                "completed_at": None,
+            })
+            save_goals(gls)
+            self.broadcast({"type": "todos", "value": gls})
+
+    async def _handle_toggle_todo(self, data: dict):
+        from actions.automation.goals import load_goals, save_goals
+        todo_id = data.get("id", "")
+        gls = load_goals()
+        for g in gls:
+            if g["id"] == todo_id:
+                g["status"] = "completed" if g["status"] == "pending" else "pending"
+                if g["status"] == "completed":
+                    g["completed_at"] = datetime.now().isoformat()
+                    for s in g.get("subtasks", []):
+                        s["status"] = "completed"
+                else:
+                    g["completed_at"] = None
+                break
+        save_goals(gls)
+        self.broadcast({"type": "todos", "value": gls})
+
+    async def _handle_delete_todo(self, data: dict):
+        from actions.automation.goals import load_goals, save_goals
+        todo_id = data.get("id", "")
+        gls = load_goals()
+        gls = [g for g in gls if g["id"] != todo_id]
+        save_goals(gls)
+        self.broadcast({"type": "todos", "value": gls})
+
+    async def _handle_list_audio_devices(self, websocket):
+        devices = {"microphones": [], "speakers": []}
+        try:
+            import pyaudio
+            pa = pyaudio.PyAudio()
+            for i in range(pa.get_device_count()):
+                info = pa.get_device_info_by_index(i)
+                dev = {
+                    "index": i,
+                    "name": info.get("name", f"Device {i}"),
+                    "channels_in": info.get("maxInputChannels", 0),
+                    "channels_out": info.get("maxOutputChannels", 0),
+                }
+                if dev["channels_in"] > 0:
+                    devices["microphones"].append(dev)
+                if dev["channels_out"] > 0:
+                    devices["speakers"].append(dev)
+            pa.terminate()
+        except Exception as e:
+            print(f"[WS] Audio devices error: {e}")
+        await websocket.send(json.dumps({"type": "audio_devices", "data": devices}))
+
+    async def _handle_list_models(self, websocket):
+        models = {"gemini": [], "openrouter": []}
+        cfg_path = CONFIG_DIR / "config.json"
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
+        except Exception:
+            cfg = {}
+
+        # Gemini
+        gemini_key = cfg.get("gemini_api_key", "")
+        if gemini_key:
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}",
+                    headers={"User-Agent": "MIN/2.0"}
+                )
+                resp = urllib.request.urlopen(req, timeout=10)
+                data_resp = json.loads(resp.read().decode("utf-8"))
+                for m in data_resp.get("models", []):
+                    models["gemini"].append({
+                        "id": m.get("name", ""),
+                        "name": m.get("displayName", m.get("name", "")),
+                        "description": m.get("description", ""),
+                    })
+            except Exception as e:
+                print(f"[WS] Gemini models error: {e}")
+
+        # OpenRouter
+        or_key = cfg.get("openrouter_api_key", "")
+        if or_key:
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    "https://openrouter.ai/api/v1/models",
+                    headers={"Authorization": f"Bearer {or_key}", "User-Agent": "MIN/2.0"}
+                )
+                resp = urllib.request.urlopen(req, timeout=10)
+                data_resp = json.loads(resp.read().decode("utf-8"))
+                for m in data_resp.get("data", []):
+                    models["openrouter"].append({
+                        "id": m.get("id", ""),
+                        "name": m.get("name", m.get("id", "")),
+                        "context_length": m.get("context_length", 0),
+                    })
+            except Exception as e:
+                print(f"[WS] OpenRouter models error: {e}")
+
+        await websocket.send(json.dumps({"type": "models_list", "data": models}))
+
+    async def _handle_agent_status(self, websocket):
+        status = {
+            "pid": os.getpid(),
+            "uptime_seconds": 0,
+            "memory_mb": 0,
+            "python_version": sys.version,
+        }
+        try:
+            proc = psutil.Process(os.getpid())
+            status["memory_mb"] = round(proc.memory_info().rss / 1024 / 1024, 1)
+            status["uptime_seconds"] = round(
+                (datetime.now() - datetime.fromtimestamp(proc.create_time())).total_seconds()
+            )
+        except Exception:
+            pass
+        await websocket.send(json.dumps({"type": "agent_status", "data": status}))
+
+    async def _handle_list_browsers(self, websocket):
+        try:
+            from actions.web.browser_registry import detect_installed_browsers, resolve_browser_path
+            detected = detect_installed_browsers()
+            current_key, current_path = resolve_browser_path()
+            await websocket.send(json.dumps({
+                "type": "browsers_list",
+                "data": {
+                    "installed": {k: v for k, v in detected.items()},
+                    "current": current_key,
+                    "current_path": current_path or "",
+                }
+            }))
+        except Exception as e:
+            print(f"[WS] Browsers list error: {e}")
+
+    # ── Broadcast ────────────────────────────────────────────────────────────
 
     def broadcast(self, data: dict):
         if not self._clients:
             return
         msg = json.dumps(data)
-
         async def do_send():
-            websockets_list = list(self._clients)
-            if websockets_list:
+            if list(self._clients):
                 await asyncio.gather(
-                    *[c.send(msg) for c in websockets_list], return_exceptions=True
+                    *[c.send(msg) for c in self._clients],
+                    return_exceptions=True
                 )
-
         if self._ws_loop:
             asyncio.run_coroutine_threadsafe(do_send(), self._ws_loop)
 
+    # ── Startup Shortcut ───────────────────────────────────────────────────
+
     def ensure_startup_shortcut(self):
         try:
-            import subprocess
-
             appdata = os.getenv("APPDATA")
             if not appdata:
                 return
@@ -752,7 +607,6 @@ class MinUI:
                 "Startup",
             )
             shortcut_path = os.path.join(startup_dir, "MIN AI.lnk")
-
             current_dir = os.path.abspath(os.path.dirname(__file__))
             target_bat = os.path.join(current_dir, "MIN.bat")
             icon_path = os.path.join(current_dir, "assets", "min_icono.ico")
@@ -768,12 +622,40 @@ class MinUI:
                 f"$s.Description='Lanzador Automatico de MIN AI';"
                 f"$s.Save()"
             )
+            import subprocess
             subprocess.run(
                 ["powershell", "-NoProfile", "-Command", ps_cmd],
                 check=True,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
-            print("[STARTUP] Startup shortcut ensured successfully.")
+            print("[STARTUP] Shortcut ensured.")
         except Exception as e:
-            print(f"[STARTUP] Error ensuring startup shortcut: {e}")
+            print(f"[STARTUP] Error: {e}")
 
+    # ── Camera Gestures ───────────────────────────────────────────────────
+
+    def _toggle_camera_gestures(self):
+        if not hasattr(self, "_gesture_thread") or self._gesture_thread is None:
+            try:
+                from services.vision.gesture_controller import GestureController
+                cfg_path = CONFIG_DIR / "config.json"
+                cam_idx = 0
+                if cfg_path.exists():
+                    try:
+                        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                        cam_idx = cfg.get("camera_index", 0)
+                    except Exception:
+                        pass
+                self._gesture_thread = GestureController(self, camera_index=cam_idx)
+                self._gesture_thread.start()
+                self.write_log("SYS: Control gestual iniciado.")
+            except Exception as e:
+                self.write_log(f"SYS: Error gesture control: {e}")
+        else:
+            self.stop_gesture_thread()
+
+    def stop_gesture_thread(self):
+        if hasattr(self, "_gesture_thread") and self._gesture_thread is not None:
+            self._gesture_thread.stop()
+            self._gesture_thread = None
+            self.write_log("SYS: Control gestual detenido.")

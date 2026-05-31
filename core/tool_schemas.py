@@ -1,8 +1,9 @@
 """
-core/tool_schemas.py — Complete list of tool declarations for Gemini Live API and compatibilities.
+core/tool_schemas.py — Tool declarations organized by category
 """
 
 TOOL_DECLARATIONS = [
+    # ── System & Computer Control ──
     {
         "name": "min_ui_control",
         "description": (
@@ -45,118 +46,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "web_search",
-        "description": "Searches the web for any information.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "query":  {"type": "STRING", "description": "Search query"},
-                "mode":   {"type": "STRING", "description": "search (default) or compare"},
-                "items":  {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Items to compare"},
-                "aspect": {"type": "STRING", "description": "price | specs | reviews"}
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "weather_report",
-        "description": "Gives the weather report. Uses config/geolocation if city is omitted.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "city": {"type": "STRING", "description": "City name"}
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "whatsapp",
-        "description": (
-            "Integración completa con WhatsApp. "
-            "SIEMPRE usar para CUALQUIER pedido de WhatsApp: enviar mensajes, "
-            "enviar imágenes/archivos, leer conversaciones, ver mensajes sin leer, "
-            "guardar/listar contactos con su número de teléfono. "
-            "Para enviar, primero verificar si el contacto está guardado con su teléfono. "
-            "Si no está, pedir el número al usuario o usar add_contact primero."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":    {"type": "STRING",  "description": "send | send_image | read | unread | add_contact | list_contacts | delete_contact"},
-                "receiver":  {"type": "STRING",  "description": "Nombre del contacto o número de teléfono con código de país (ej: 5491155551234)"},
-                "message":   {"type": "STRING",  "description": "Texto del mensaje a enviar"},
-                "image_path":{"type": "STRING",  "description": "Ruta de la imagen para send_image"},
-                "caption":   {"type": "STRING",  "description": "Descripción de la imagen (opcional)"},
-                "count":     {"type": "INTEGER", "description": "Cantidad de mensajes a leer (default: 10)"},
-                "name":      {"type": "STRING",  "description": "Nombre del contacto para add_contact/delete_contact"},
-                "phone":     {"type": "STRING",  "description": "Número de teléfono con código de país (ej: 5491155551234) para add_contact"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "send_message",
-        "description": "Sends a text message via Telegram, Discord, Signal or other messaging platform. For WhatsApp, use the 'whatsapp' tool instead.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "receiver":     {"type": "STRING", "description": "Recipient contact name"},
-                "message_text": {"type": "STRING", "description": "The message to send"},
-                "platform":     {"type": "STRING", "description": "Platform: Telegram, Discord, Signal, Messenger (NOT WhatsApp — use whatsapp tool)"}
-            },
-            "required": ["receiver", "message_text", "platform"]
-        }
-    },
-    {
-        "name": "reminder",
-        "description": "Sets a timed reminder using Task Scheduler.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "date":    {"type": "STRING", "description": "Date in YYYY-MM-DD format"},
-                "time":    {"type": "STRING", "description": "Time in HH:MM format (24h)"},
-                "message": {"type": "STRING", "description": "Reminder message text"}
-            },
-            "required": ["date", "time", "message"]
-        }
-    },
-    {
-        "name": "youtube_video",
-        "description": (
-            "Controls YouTube. Use for: playing videos, summarizing a video's content, "
-            "getting video info, or showing trending videos."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {"type": "STRING", "description": "play | summarize | get_info | trending (default: play)"},
-                "query":  {"type": "STRING", "description": "Search query for play action"},
-                "save":   {"type": "BOOLEAN", "description": "Save summary to Notepad (summarize only)"},
-                "region": {"type": "STRING", "description": "Country code for trending e.g. TR, US"},
-                "url":    {"type": "STRING", "description": "Video URL for get_info action"},
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "screen_process",
-        "description": (
-            "Captures and analyzes the screen or webcam image. "
-            "MUST be called when user asks what is on screen, what you see, "
-            "analyze my screen, look at camera, etc. "
-            "You have NO visual ability without this tool. "
-            "After calling this tool, stay SILENT — the vision module speaks directly."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "angle": {"type": "STRING", "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"},
-                "text":  {"type": "STRING", "description": "The question or instruction about the captured image"}
-            },
-            "required": ["text"]
-        }
-    },
-    {
         "name": "computer_settings",
         "description": (
             "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
@@ -177,64 +66,26 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "browser_control",
-        "description": (
-            "Controla el navegador activo del usuario (Chrome, Edge, Firefox, etc.) sin abrir uno nuevo. "
-            "Usa esta herramienta cuando el usuario te pida interactuar con la web. "
-            "Acciones soportadas: navegar a una URL, buscar en Google, abrir o cerrar pestañas, y scrollear."
-        ),
+        "name": "computer_control",
+        "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "Acciones permitidas: go_to | search | new_tab | close_tab | scroll"},
-                "url":         {"type": "STRING", "description": "URL para las acciones go_to o new_tab"},
-                "query":       {"type": "STRING", "description": "Término de búsqueda para la acción search"},
-                "direction":   {"type": "STRING", "description": "Dirección de scroll: up | down (solo para scroll)"}
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "visual_click",
-        "description": "Utiliza Visión Espacial para encontrar las coordenadas matemáticas de un elemento en la pantalla y hacer clic en él físicamente.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "element_description": {"type": "STRING", "description": "Descripción clara de lo que quieres cliquear (ej: 'botón de enviar', 'ícono de la papelera')."}
-            },
-            "required": ["element_description"]
-        }
-    },
-    {
-        "name": "sleep_mode",
-        "description": "Entra en modo suspensión. Desactiva el micrófono para la IA hasta que el usuario diga 'Oye MIN' o 'MIN' localmente.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {}
-        }
-    },
-    {
-        "name": "file_controller",
-        "description": (
-            "Manages files and folders: list, create, delete (to recycle bin), move, copy, rename, read, write, find, disk usage. "
-            "Use action=find with name + path to locate files by name in any directory (desktop, downloads, etc.). "
-            "After finding a file, pass the returned path to another tool to act on it."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete (mueve a papelera) | move | copy | rename | read | write | edit | find | largest | disk_usage | organize_desktop | info"},
-                "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
-                "destination": {"type": "STRING", "description": "Destination path for move/copy"},
-                "new_name":    {"type": "STRING", "description": "New name for rename"},
-                "content":     {"type": "STRING", "description": "Content for create_file/write"},
-                "name":        {"type": "STRING", "description": "File name to search for"},
-                "extension":   {"type": "STRING", "description": "File extension to search (e.g. .pdf)"},
-                "count":       {"type": "INTEGER", "description": "Number of results for largest"},
-                "old_text":    {"type": "STRING",  "description": "Texto a reemplazar (para edit)"},
-                "new_text":    {"type": "STRING",  "description": "Nuevo texto o contenido (para edit)"},
-                "mode":        {"type": "STRING",  "description": "replace | append | prepend | overwrite (para edit)"},
-                "confirm":     {"type": "BOOLEAN", "description": "true para confirmar eliminaciones"},
+                "action":      {"type": "STRING",  "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"},
+                "text":        {"type": "STRING",  "description": "Text to type or paste"},
+                "x":           {"type": "INTEGER", "description": "X coordinate"},
+                "y":           {"type": "INTEGER", "description": "Y coordinate"},
+                "keys":        {"type": "STRING",  "description": "Key combination e.g. 'ctrl+c'"},
+                "key":         {"type": "STRING",  "description": "Single key e.g. 'enter'"},
+                "direction":   {"type": "STRING",  "description": "up | down | left | right"},
+                "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
+                "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
+                "title":       {"type": "STRING",  "description": "Window title for focus_window"},
+                "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
+                "type":        {"type": "STRING",  "description": "Data type for random_data"},
+                "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},
+                "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
+                "path":        {"type": "STRING",  "description": "Save path for screenshot"},
             },
             "required": ["action"]
         }
@@ -249,569 +100,34 @@ TOOL_DECLARATIONS = [
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "wallpaper | wallpaper_url | organize | clean | list | stats | task"},
-                "path":        {"type": "STRING", "description": "Image path for wallpaper"},
-                "url":         {"type": "STRING", "description": "Image URL for wallpaper_url"},
-                "mode":        {"type": "STRING", "description": "by_type or by_date for organize"},
-                "task":        {"type": "STRING", "description": "Natural language desktop task"},
-                "search_name": {"type": "STRING", "description": "Filename to search for in a directory (auto-finds full path)"},
-                "search_path": {"type": "STRING", "description": "Directory to search: desktop, downloads, documents, pictures, home (default: desktop)"},
+                "action":      {"type": "STRING",  "description": "wallpaper | wallpaper_url | organize | clean | list | stats | task"},
+                "path":        {"type": "STRING",  "description": "Image path for wallpaper"},
+                "url":         {"type": "STRING",  "description": "Image URL for wallpaper_url"},
+                "mode":        {"type": "STRING",  "description": "by_type or by_date for organize"},
+                "task":        {"type": "STRING",  "description": "Natural language desktop task"},
+                "search_name": {"type": "STRING",  "description": "Filename to search for in a directory (auto-finds full path)"},
+                "search_path": {"type": "STRING",  "description": "Directory to search: desktop, downloads, documents, pictures, home (default: desktop)"},
             },
             "required": ["action"]
         }
     },
     {
-        "name": "code_helper",
-        "description": "Writes, edits, explains, runs, or builds code files.",
+        "name": "system_monitor",
+        "description": (
+            "Monitorea el rendimiento del sistema en tiempo real: CPU, RAM, GPU, discos, "
+            "red, temperatura, batería, procesos activos, uptime. "
+            "Usar para: '¿cómo está la PC?', 'qué proceso consume más', 'temperatura del CPU', "
+            "'cuánta RAM libre tengo', 'matar proceso X', 'resumen de rendimiento'."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "write | edit | explain | run | build | auto (default: auto)"},
-                "description": {"type": "STRING", "description": "What the code should do or what change to make"},
-                "language":    {"type": "STRING", "description": "Programming language (default: python)"},
-                "output_path": {"type": "STRING", "description": "Where to save the file"},
-                "file_path":   {"type": "STRING", "description": "Path to existing file for edit/explain/run/build"},
-                "code":        {"type": "STRING", "description": "Raw code string for explain"},
-                "args":        {"type": "STRING", "description": "CLI arguments for run/build"},
-                "timeout":     {"type": "INTEGER", "description": "Execution timeout in seconds (default: 30)"},
+                "action":   {"type": "STRING",  "description": "cpu | ram | disk | network | gpu | temperature | battery | uptime | processes | kill | report"},
+                "sort_by":  {"type": "STRING",  "description": "Para processes: cpu (default) | ram"},
+                "count":    {"type": "INTEGER", "description": "Para processes: cantidad a mostrar (default: 10)"},
+                "name":     {"type": "STRING",  "description": "Para kill: nombre o PID del proceso"},
             },
             "required": ["action"]
-        }
-    },
-    {
-        "name": "dev_agent",
-        "description": "Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "description":  {"type": "STRING", "description": "What the project should do"},
-                "language":     {"type": "STRING", "description": "Programming language (default: python)"},
-                "project_name": {"type": "STRING", "description": "Optional project folder name"},
-                "timeout":      {"type": "INTEGER", "description": "Run timeout in seconds (default: 30)"},
-            },
-            "required": ["description"]
-        }
-    },
-    {
-        "name": "agent_task",
-        "description": (
-            "Executes complex multi-step tasks requiring multiple different tools. "
-            "Examples: 'research X and save to file', 'find and organize files'. "
-            "DO NOT use for single commands. NEVER use for Steam/Epic — use game_updater."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "goal":     {"type": "STRING", "description": "Complete description of what to accomplish"},
-                "priority": {"type": "STRING", "description": "low | normal | high (default: normal)"}
-            },
-            "required": ["goal"]
-        }
-    },
-    {
-        "name": "computer_control",
-        "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"},
-                "text":        {"type": "STRING", "description": "Text to type or paste"},
-                "x":           {"type": "INTEGER", "description": "X coordinate"},
-                "y":           {"type": "INTEGER", "description": "Y coordinate"},
-                "keys":        {"type": "STRING", "description": "Key combination e.g. 'ctrl+c'"},
-                "key":         {"type": "STRING", "description": "Single key e.g. 'enter'"},
-                "direction":   {"type": "STRING", "description": "up | down | left | right"},
-                "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
-                "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
-                "title":       {"type": "STRING",  "description": "Window title for focus_window"},
-                "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
-                "type":        {"type": "STRING",  "description": "Data type for random_data"},
-                "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},
-                "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
-                "path":        {"type": "STRING",  "description": "Save path for screenshot"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "game_updater",
-        "description": (
-            "THE ONLY tool for ANY Steam or Epic Games request. "
-            "Use for: installing, downloading, updating games, listing installed games, "
-            "checking download status, scheduling updates. "
-            "ALWAYS call directly for any Steam/Epic/game request. "
-            "NEVER use agent_task, browser_control, or web_search for Steam/Epic."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":    {"type": "STRING",  "description": "update | install | list | download_status | schedule | cancel_schedule | schedule_status (default: update)"},
-                "platform":  {"type": "STRING",  "description": "steam | epic | both (default: both)"},
-                "game_name": {"type": "STRING",  "description": "Game name (partial match supported)"},
-                "app_id":    {"type": "STRING",  "description": "Steam AppID for install (optional)"},
-                "hour":      {"type": "INTEGER", "description": "Hour for scheduled update 0-23 (default: 3)"},
-                "minute":    {"type": "INTEGER", "description": "Minute for scheduled update 0-59 (default: 0)"},
-                "shutdown_when_done": {"type": "BOOLEAN", "description": "Shut down PC when download finishes"},
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "flight_finder",
-        "description": "Searches Google Flights and speaks the best options.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "origin":      {"type": "STRING",  "description": "Departure city or airport code"},
-                "destination": {"type": "STRING",  "description": "Arrival city or airport code"},
-                "date":        {"type": "STRING",  "description": "Departure date (any format)"},
-                "return_date": {"type": "STRING",  "description": "Return date for round trips"},
-                "passengers":  {"type": "INTEGER", "description": "Number of passengers (default: 1)"},
-                "cabin":       {"type": "STRING",  "description": "economy | premium | business | first"},
-                "save":        {"type": "BOOLEAN", "description": "Save results to Notepad"},
-            },
-            "required": ["origin", "destination", "date"]
-        }
-    },
-    {
-        "name": "shutdown_min",
-        "description": (
-            "Shuts down the assistant completely. "
-            "Call this when the user expresses intent to end the conversation, "
-            "close the assistant, say goodbye, or stop Min. "
-            "The user can say this in ANY language."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {},
-        }
-    },
-    {
-        "name": "file_processor",
-        "description": (
-            "Processes any file that the user has uploaded or dropped onto the interface. "
-            "Use this when the user refers to an uploaded file and wants an action on it. "
-            "Supports: images (describe/ocr/resize/compress/convert), "
-            "PDFs (summarize/extract_text/to_word), "
-            "Word docs & text files (summarize/fix/reformat/translate), "
-            "CSV/Excel (analyze/stats/filter/sort/convert), "
-            "JSON/XML (validate/format/analyze), "
-            "code files (explain/review/fix/optimize/run/document/test), "
-            "audio (transcribe/trim/convert/info), "
-            "video (trim/extract_audio/extract_frame/compress/transcribe/info), "
-            "archives (list/extract), "
-            "presentations (summarize/extract_text). "
-            "ALWAYS call this tool when a file has been uploaded and the user gives a command about it. "
-            "If the user's command is ambiguous, pick the most logical action for that file type."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "file_path": {
-                    "type": "STRING",
-                    "description": "Full path to the uploaded file. Leave empty to use the currently uploaded file."
-                },
-                "action": {
-                    "type": "STRING",
-                    "description": (
-                        "What to do with the file. Examples by type:\n"
-                        "image: describe | ocr | resize | compress | convert | info\n"
-                        "pdf: summarize | extract_text | to_word | info\n"
-                        "docx/txt: summarize | fix | reformat | translate_hint | word_count | to_bullet\n"
-                        "csv/excel: analyze | stats | filter | sort | convert | info\n"
-                        "json: validate | format | analyze | to_csv\n"
-                        "code: explain | review | fix | optimize | run | document | test\n"
-                        "audio: transcribe | trim | convert | info\n"
-                        "video: trim | extract_audio | extract_frame | compress | transcribe | info | convert\n"
-                        "archive: list | extract\n"
-                        "pptx: summarize | extract_text | analyze"
-                    )
-                },
-                "instruction": {
-                    "type": "STRING",
-                    "description": "Free-form instruction if action doesn't cover it. E.g. 'translate this to Turkish', 'find all email addresses'"
-                },
-                "format": {
-                    "type": "STRING",
-                    "description": "Target format for conversion. E.g. 'mp3', 'pdf', 'csv', 'png'"
-                },
-                "width":     {"type": "INTEGER", "description": "Target width for image resize"},
-                "height":    {"type": "INTEGER", "description": "Target height for image resize"},
-                "scale":     {"type": "NUMBER",  "description": "Scale factor for image resize (e.g. 0.5)"},
-                "quality":   {"type": "INTEGER", "description": "Quality 1-100 for image/video compress"},
-                "start":     {"type": "STRING",  "description": "Start time for trim: seconds or HH:MM:SS"},
-                "end":       {"type": "STRING",  "description": "End time for trim: seconds or HH:MM:SS"},
-                "timestamp": {"type": "STRING",  "description": "Timestamp for video frame extraction HH:MM:SS"},
-                "column":    {"type": "STRING",  "description": "Column name for CSV filter/sort"},
-                "value":     {"type": "STRING",  "description": "Filter value for CSV filter"},
-                "condition": {"type": "STRING",  "description": "Filter condition: equals|contains|gt|lt"},
-                "ascending": {"type": "BOOLEAN", "description": "Sort order for CSV sort (default: true)"},
-                "save":      {"type": "BOOLEAN", "description": "Save result to file (default: true)"},
-                "destination": {"type": "STRING", "description": "Output folder for archive extract"},
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "google_calendar",
-        "description": (
-            "Manages the user's Google Calendar: create, list, edit, or delete events. "
-            "Use for ANY request about calendar events, appointments, reminders with dates, "
-            "scheduling meetings, or checking what's coming up. "
-            "ALWAYS call this tool for calendar requests — never simulate. "
-            "For 'list': shows upcoming events. "
-            "For 'create': needs summary and start (end defaults to +1h). "
-            "For 'edit'/'delete': needs event_id (get it from 'list' first)."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING",  "description": "list | create | edit | delete"},
-                "summary":     {"type": "STRING",  "description": "Event title/name"},
-                "start":       {"type": "STRING",  "description": "Start date/time: ISO, YYYY-MM-DD HH:MM, or DD/MM/YYYY HH:MM"},
-                "end":         {"type": "STRING",  "description": "End date/time (optional — defaults to start + 1 hour)"},
-                "description": {"type": "STRING",  "description": "Event notes or description"},
-                "location":    {"type": "STRING",  "description": "Event location"},
-                "event_id":    {"type": "STRING",  "description": "Event ID (first 8 chars from list) for edit/delete"},
-                "days_ahead":  {"type": "INTEGER", "description": "Days to look ahead for list (default: 7)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "spotify_control",
-        "description": (
-            "Control total de Spotify: reproducir, pausar, siguiente, anterior, volumen, "
-            "buscar canciones/artistas/álbumes/playlists, aleatorio, repetir, ver qué suena, "
-            "guardar canciones, ver dispositivos. "
-            "SIEMPRE llamar esta herramienta para CUALQUIER pedido relacionado con Spotify o música."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {"type": "STRING", "description": "play | pause | resume | next | previous | volume | shuffle | repeat | current | search | like | devices | playlist"},
-                "query":  {"type": "STRING", "description": "Búsqueda para play/search: canción, artista, álbum o playlist"},
-                "type":   {"type": "STRING", "description": "track | album | playlist | artist (default: track)"},
-                "value":  {"type": "STRING", "description": "Valor para volume (0-100), shuffle (true/false), repeat (off/track/context)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "media_control",
-        "description": (
-            "Control multimedia del sistema (teclas de media): play/pause, siguiente, anterior, volumen. "
-            "Usar cuando el usuario pida controlar musica o reproduccion general sin mencionar Spotify."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "play | pause | play_pause | toggle | next | previous | prev | stop | volume_up | volume_down | mute"
-                }
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "rgb_control",
-        "description": (
-            "Controla las luces RGB de periféricos y componentes de la PC (teclado, mouse, GPU, RAM, etc.). "
-            "Requiere OpenRGB corriendo con servidor SDK activado. "
-            "Usar para: cambiar color, apagar, brillo, efectos, arco iris."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":     {"type": "STRING", "description": "set_color | off | brightness | effect | rainbow | list"},
-                "color":      {"type": "STRING", "description": "Color: nombre (rojo, azul, verde, blanco…) o hex #RRGGBB"},
-                "brightness": {"type": "INTEGER", "description": "Brillo 0-100 (default: 100)"},
-                "device":     {"type": "STRING", "description": "Filtro por nombre de dispositivo (opcional, aplica a todos si se omite)"},
-                "effect":     {"type": "STRING", "description": "Nombre del efecto para la acción effect"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "scheduler",
-        "description": (
-            "Crea, lista, elimina o ejecuta automatizaciones programadas (tareas recurrentes). "
-            "Ejemplos: backup diario, notificaciones, scripts automáticos. "
-            "Usar para CUALQUIER pedido de 'todos los días a las X', 'cada semana', 'automatizar'."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":           {"type": "STRING",  "description": "list | create | delete | enable | disable | run_now"},
-                "name":             {"type": "STRING",  "description": "Nombre descriptivo de la tarea"},
-                "frequency":        {"type": "STRING",  "description": "daily | weekly | interval | once"},
-                "hour":             {"type": "INTEGER", "description": "Hora de ejecución (0-23)"},
-                "minute":           {"type": "INTEGER", "description": "Minuto de ejecución (0-59)"},
-                "weekday":          {"type": "STRING",  "description": "Día de la semana para frequency=weekly"},
-                "interval_minutes": {"type": "INTEGER", "description": "Intervalo en minutos para frequency=interval"},
-                "task_action":      {"type": "STRING",  "description": "backup | file_controller | notify | custom_script | browser_control"},
-                "task_parameters":  {"type": "OBJECT",  "description": "Parámetros de la tarea (source, destination para backup, etc.)"},
-                "task_id":          {"type": "STRING",  "description": "ID de la tarea (primeros 6 chars) para delete/enable/disable/run_now"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "google_drive",
-        "description": (
-            "Gestiona Google Drive: listar archivos, buscar, subir, descargar, crear carpetas, eliminar, compartir. "
-            "SIEMPRE usar para cualquier pedido sobre Google Drive."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "list | search | upload | download | create_folder | delete | share | info"},
-                "folder_id":   {"type": "STRING", "description": "ID de la carpeta (default: root)"},
-                "file_id":     {"type": "STRING", "description": "ID del archivo para download/delete/share/info"},
-                "path":        {"type": "STRING", "description": "Ruta local para upload"},
-                "name":        {"type": "STRING", "description": "Nombre de la nueva carpeta"},
-                "query":       {"type": "STRING", "description": "Término de búsqueda"},
-                "destination": {"type": "STRING", "description": "Carpeta local de destino para download"},
-                "email":       {"type": "STRING", "description": "Email para compartir"},
-                "role":        {"type": "STRING", "description": "reader | writer | commenter"},
-                "confirm":     {"type": "BOOLEAN", "description": "true para confirmar eliminación"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "gmail_control",
-        "description": (
-            "Gestiona Gmail: leer bandeja, leer correo, enviar, responder, buscar, archivar, eliminar. "
-            "SIEMPRE usar para cualquier pedido sobre correo electrónico o Gmail."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":     {"type": "STRING",  "description": "inbox | read | send | reply | search | archive | delete | mark_read | labels"},
-                "count":      {"type": "INTEGER", "description": "Cantidad de correos a listar/buscar (default: 5)"},
-                "message_id": {"type": "STRING",  "description": "ID del mensaje para read/reply/archive/delete/mark_read"},
-                "to":         {"type": "STRING",  "description": "Destinatario para send"},
-                "subject":    {"type": "STRING",  "description": "Asunto para send"},
-                "body":       {"type": "STRING",  "description": "Cuerpo del correo para send/reply"},
-                "query":      {"type": "STRING",  "description": "Búsqueda Gmail para search (ej: 'from:juan', 'subject:factura')"},
-                "confirm":    {"type": "BOOLEAN", "description": "true para confirmar eliminación"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "google_maps",
-        "description": (
-            "Muestra rutas de navegación y mapas interactivos. "
-            "Usar para: cómo llegar a un lugar, cuánto tarda, indicaciones paso a paso, "
-            "buscar una dirección en el mapa. Abre mapa MIN en el browser con la ruta marcada. "
-            "SIEMPRE llamar para cualquier pedido de navegación, rutas o mapas."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "directions | search"},
-                "origin":      {"type": "STRING", "description": "Punto de partida (dirección, ciudad, lugar)"},
-                "destination": {"type": "STRING", "description": "Destino (dirección, ciudad, lugar)"},
-                "mode":        {"type": "STRING", "description": "car (auto) | walk (caminando) | bike (bicicleta). Default: car"},
-                "query":       {"type": "STRING", "description": "Lugar a buscar en el mapa (para action=search)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "rules_engine",
-        "description": (
-            "Motor de automatizaciones y alertas inteligentes. "
-            "USAR SIEMPRE cuando el usuario pida: 'cuando diga X hacé Y', 'cada vez que diga X', "
-            "'si digo X abrí/poné/hacé Y', 'quiero que cuando diga X...'. "
-            "Soporta: phrase triggers (frase → acción), time triggers (hora → acción), alertas. "
-            "Listar, crear, eliminar, habilitar/deshabilitar automaciones. "
-            "CONDITION types: phrase (frase del usuario), time (hora del día), file_exists, always. "
-            "ACTION types: open_app, spotify_play, browser, smart_home, composite (múltiples), notify, speak, run_script."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":     {"type": "STRING", "description": "list | list_phrases | create | delete | enable | disable | trigger | alert"},
-                "name":       {"type": "STRING", "description": "Nombre de la automatización"},
-                "rule_id":    {"type": "STRING", "description": "ID de la regla para delete/enable/disable/trigger"},
-                "condition":  {
-                    "type": "OBJECT",
-                    "description": (
-                        "Condición. phrase: {type:phrase, trigger:'texto exacto', match:contains|exact|startswith}. "
-                        "time: {type:time, hour:8, minute:0, days:[monday,...]}. "
-                        "file_exists: {type:file_exists, path:'...'}. always: {type:always}"
-                    )
-                },
-                "action_def": {
-                    "type": "OBJECT",
-                    "description": (
-                        "Acción a ejecutar. "
-                        "open_app: {type:open_app, app_name:'Spotify'}. "
-                        "spotify_play: {type:spotify_play, query:'Back in Black AC/DC'}. "
-                        "browser: {type:browser, url:'https://...'}. "
-                        "smart_home: {type:smart_home, device:'living', action:'on'}. "
-                        "composite: {type:composite, actions:[{...},{...}]}. "
-                        "notify: {type:notify, message:'...'}. speak: {type:speak, message:'...'}. "
-                        "run_script: {type:run_script, command:'...'}."
-                    )
-                },
-                "message":    {"type": "STRING", "description": "Mensaje para action=alert"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "user_profile",
-        "description": (
-            "Perfil dinámico del usuario — hábitos, preferencias, historial de uso. "
-            "Ver perfil, configurar preferencias, ver hábitos aprendidos, guardar notas personales. "
-            "MIN aprende automáticamente los patrones del usuario."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {"type": "STRING", "description": "view | set_preference | set_name | add_note | notes | habits | reset"},
-                "key":    {"type": "STRING", "description": "Clave de preferencia (ej: idioma, tema, ciudad)"},
-                "value":  {"type": "STRING", "description": "Valor de la preferencia"},
-                "name":   {"type": "STRING", "description": "Nombre del usuario"},
-                "note":   {"type": "STRING", "description": "Nota personal a guardar"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "goals",
-        "description": (
-            "Sistema de objetivos persistentes a largo plazo. "
-            "Crear metas, trackear progreso, marcar pasos completados. "
-            "Usar para: metas personales, proyectos, hábitos, objetivos con deadline. "
-            "SIEMPRE usar para pedidos de 'quiero lograr X', 'mi objetivo es', 'meta de'."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING",  "description": "list | create | update_progress | complete | complete_step | add_step | delete | detail"},
-                "goal_id":     {"type": "STRING",  "description": "ID del objetivo para update/complete/delete/detail"},
-                "title":       {"type": "STRING",  "description": "Título del objetivo"},
-                "description": {"type": "STRING",  "description": "Descripción detallada"},
-                "deadline":    {"type": "STRING",  "description": "Fecha límite ISO (YYYY-MM-DD)"},
-                "progress":    {"type": "INTEGER", "description": "Progreso 0-100"},
-                "steps":       {"type": "ARRAY",   "items": {"type": "STRING"}, "description": "Lista de pasos del objetivo"},
-                "step":        {"type": "STRING",  "description": "Texto del nuevo paso (add_step)"},
-                "step_index":  {"type": "INTEGER", "description": "Índice del paso a completar (0-based)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "git_control",
-        "description": (
-            "Integración completa con Git: status, log, diff, commit automático, "
-            "branches, pull, push, stash, análisis de cambios. "
-            "Usar para CUALQUIER pedido relacionado con Git o control de versiones."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING",  "description": "status | log | diff | commit | add | branches | branch_create | checkout | pull | push | stash | analyze"},
-                "repo_path":   {"type": "STRING",  "description": "Ruta al repositorio Git"},
-                "message":     {"type": "STRING",  "description": "Mensaje del commit"},
-                "branch_name": {"type": "STRING",  "description": "Nombre de la rama"},
-                "remote":      {"type": "STRING",  "description": "Remote (default: origin)"},
-                "n":           {"type": "INTEGER", "description": "Número de commits para log"},
-                "file":        {"type": "STRING",  "description": "Archivo específico para diff"},
-                "staged":      {"type": "BOOLEAN", "description": "Mostrar diff staged"},
-                "add_all":     {"type": "BOOLEAN", "description": "Agregar todos los archivos antes del commit (default: true)"},
-                "files":       {"type": "ARRAY",   "items": {"type": "STRING"}, "description": "Archivos para add"},
-                "sub":         {"type": "STRING",  "description": "Subcomando para stash: push|pop|list"},
-            },
-            "required": ["action", "repo_path"]
-        }
-    },
-    {
-        "name": "codebase",
-        "description": (
-            "Indexación y búsqueda inteligente de proyectos de código. "
-            "Indexar proyectos, buscar en archivos, encontrar símbolos (funciones/clases), "
-            "generar documentación automática, búsqueda avanzada de código. "
-            "Usar para: 'buscar en mi proyecto', 'dónde está la función X', 'generar docs', 'indexar mi código'."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":    {"type": "STRING", "description": "index | list | info | search | find_symbol | generate_docs | remove"},
-                "path":      {"type": "STRING", "description": "Ruta del proyecto a indexar"},
-                "name":      {"type": "STRING", "description": "Nombre del proyecto (default: nombre de carpeta)"},
-                "project":   {"type": "STRING", "description": "Nombre del proyecto para info/search/find_symbol"},
-                "query":     {"type": "STRING", "description": "Texto a buscar en el código"},
-                "symbol":    {"type": "STRING", "description": "Nombre de función/clase a buscar"},
-                "file_path": {"type": "STRING", "description": "Ruta del archivo para generate_docs"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "knowledge_base",
-        "description": (
-            "Segundo cerebro / base de conocimiento personal. "
-            "Guardar notas, ideas, snippets de código, referencias, hechos, preguntas. "
-            "Buscar en el conocimiento guardado, exportar. "
-            "Usar para: 'recordá que...', 'guardá esta idea', 'anotá este código', 'buscar en mis notas'."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":   {"type": "STRING", "description": "add/save/store | search/find | list | get/read/view | update | delete | stats | export"},
-                "title":    {"type": "STRING", "description": "Título de la entrada"},
-                "content":  {"type": "STRING", "description": "Contenido o texto a guardar"},
-                "type":     {"type": "STRING", "description": "note | idea | snippet | reference | fact | task | question"},
-                "tags":     {"type": "STRING", "description": "Tags separados por coma (ej: python, min, idea)"},
-                "query":    {"type": "STRING", "description": "Búsqueda en la base de conocimiento"},
-                "entry_id": {"type": "STRING", "description": "ID de la entrada para get/update/delete"},
-                "path":     {"type": "STRING", "description": "Ruta para exportar (action=export)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "social_media",
-        "description": (
-            "Controla redes sociales: Twitter/X, Instagram, TikTok y LinkedIn. "
-            "Twitter: publicar tweets, ver timeline, buscar, like, retweet, ver perfil. "
-            "Instagram: publicar fotos, subir historias, enviar DMs, ver feed, like, comentar. "
-            "TikTok: subir videos, ver perfil/stats, tendencias. "
-            "LinkedIn: publicar posts, ver perfil, ver feed, enviar mensajes. "
-            "SIEMPRE usar para cualquier pedido de redes sociales. "
-            "Para WhatsApp usar la herramienta 'whatsapp'. "
-            "Usá action=setup para ver cómo configurar las credenciales."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "platform": {"type": "STRING", "description": "twitter | instagram | tiktok | linkedin | setup"},
-                "action":   {"type": "STRING", "description": (
-                    "Twitter: tweet, delete_tweet, like, retweet, timeline, search_tweets, my_tweets, profile | "
-                    "Instagram: post/upload_photo, story, send_dm, feed, profile, like, comment | "
-                    "TikTok: upload/publicar, profile/perfil, trending | "
-                    "LinkedIn: post/publicar, profile/perfil, send_message/mensaje, feed"
-                )},
-                "text":       {"type": "STRING", "description": "Texto del tweet/post/comentario/mensaje"},
-                "content":    {"type": "STRING", "description": "Contenido del post (LinkedIn/TikTok)"},
-                "tweet_id":   {"type": "STRING", "description": "ID del tweet para like/retweet/delete"},
-                "media_id":   {"type": "STRING", "description": "ID del post de Instagram para like/comment"},
-                "username":   {"type": "STRING", "description": "Usuario para DM/perfil (Instagram, TikTok, LinkedIn)"},
-                "receiver":   {"type": "STRING", "description": "Destinatario del DM de Instagram"},
-                "image_path": {"type": "STRING", "description": "Ruta imagen para Instagram/LinkedIn"},
-                "video_path": {"type": "STRING", "description": "Ruta del video para TikTok"},
-                "caption":    {"type": "STRING", "description": "Descripción/caption de la foto o video"},
-                "query":      {"type": "STRING", "description": "Búsqueda de tweets"},
-                "count":      {"type": "INTEGER", "description": "Cantidad de resultados (default: 5)"},
-            },
-            "required": ["platform", "action"]
         }
     },
     {
@@ -891,94 +207,570 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "save_memory",
+        "name": "native_ui",
         "description": (
-            "Save an important personal fact about the user to long-term memory. "
-            "Call this silently whenever the user reveals something worth remembering: "
-            "name, age, city, job, preferences, hobbies, relationships, projects, or future plans. "
-            "Do NOT call for: weather, reminders, searches, or one-time commands. "
-            "Do NOT announce that you are saving — just call it silently. "
-            "Values must be in English regardless of the conversation language."
+            "Automatización de Interfaz Nativa de Windows (UI Automation). "
+            "USAR para listar, enfocar, escribir o hacer clic en ventanas de forma 100% precisa, saltándose la visión. "
+            "Esto EVITA errores de cuota (Error 429) y permite simulación exacta de teclado/mouse."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "category": {
+                "action": {
                     "type": "STRING",
-                    "description": (
-                        "identity — name, age, birthday, city, job, language, nationality | "
-                        "preferences — favorite food/color/music/film/game/sport, hobbies | "
-                        "projects — active projects, goals, things being built | "
-                        "relationships — friends, family, partner, colleagues | "
-                        "wishes — future plans, things to buy, travel dreams | "
-                        "notes — habits, schedule, anything else worth remembering"
-                    )
+                    "description": "Acción a realizar: list_windows | focus_window | type_in_window | click_center"
                 },
-                "key":   {"type": "STRING", "description": "Short snake_case key (e.g. name, favorite_food, sister_name)"},
-                "value": {"type": "STRING", "description": "Concise value in English (e.g. Fatih, pizza, older sister)"},
-            },
-            "required": ["category", "key", "value"]
-        }
-    },
-    {
-        "name": "image_generation",
-        "description": (
-            "Genera imágenes con inteligencia artificial a partir de una descripción en texto. "
-            "Usa Pollinations.ai (gratis, open-source, sin API key) o Gemini. "
-            "SIEMPRE llamar cuando el usuario pide 'generame una imagen', 'crea una foto de', "
-            "'dibujame', 'haceme una imagen', 'quiero una foto de', o 'mostrame', etc. "
-            "Después de generar, la imagen se muestra automáticamente en el widget de MIN."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "prompt":       {"type": "STRING",  "description": "Descripción detallada de la imagen a generar"},
-                "count":        {"type": "INTEGER", "description": "Cantidad de imágenes (1-4, default: 1)"},
-                "aspect_ratio": {"type": "STRING",  "description": "Relación de aspecto: 1:1 | 4:3 | 3:4 | 16:9 | 9:16 (default: 1:1)"},
-                "save_path":    {"type": "STRING",  "description": "Carpeta de guardado (default: ~/Pictures/MIN_Generadas)"},
-            },
-            "required": ["prompt"]
-        }
-    },
-    {
-        "name": "smart_home",
-        "description": (
-            "Controla las luces y dispositivos inteligentes del hogar. "
-            "Soporta Tuya/Smart Life, Philips Hue, LIFX y Yeelight. "
-            "SIEMPRE llamar para: encender/apagar luces, cambiar color, brillo, temperatura de color, "
-            "activar escenas, consultar estado. "
-            "Si no hay dispositivos configurados, usar action=setup para ver instrucciones."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING",  "description": "on | off | toggle | color | brightness | temperature | scene | status | list | setup"},
-                "device":      {"type": "STRING",  "description": "Nombre o sala del dispositivo (ej: 'sala', 'cuarto', 'lampara principal'). Omitir = todos."},
-                "color":       {"type": "STRING",  "description": "Color: nombre (rojo, azul, blanco, cálido…) o hex #RRGGBB"},
-                "value":       {"type": "INTEGER", "description": "Valor numérico para brightness (1-100) o temperatura Kelvin (1700-9000)"},
-                "brightness":  {"type": "INTEGER", "description": "Brillo 1-100 (alternativa a value)"},
-                "scene":       {"type": "STRING",  "description": "Nombre de la escena: relajar, leer, trabajar, noche, fiesta"},
-                "protocol":    {"type": "STRING",  "description": "tuya | hue | lifx | yeelight. Omitir = usa el configurado por defecto."},
-                "group":       {"type": "STRING",  "description": "Nombre del grupo/sala en Philips Hue"},
+                "window_title": {
+                    "type": "STRING",
+                    "description": "El nombre (o parte del nombre) de la ventana destino. (Ej: 'WhatsApp', 'Chrome')"
+                },
+                "text": {
+                    "type": "STRING",
+                    "description": "El texto a escribir (solo si action es type_in_window)"
+                }
             },
             "required": ["action"]
         }
     },
     {
-        "name": "system_monitor",
+        "name": "terminal_agent",
         "description": (
-            "Monitorea el rendimiento del sistema en tiempo real: CPU, RAM, GPU, discos, "
-            "red, temperatura, batería, procesos activos, uptime. "
-            "Usar para: '¿cómo está la PC?', 'qué proceso consume más', 'temperatura del CPU', "
-            "'cuánta RAM libre tengo', 'matar proceso X', 'resumen de rendimiento'."
+            "Ejecuta CUALQUIER comando en la terminal de Windows (PowerShell o CMD). "
+            "USAR LIBREMENTE como recurso general para CUALQUIER tarea del sistema operativo: "
+            "instalar/desinstalar programas (winget, choco, pip), consultar información del sistema, "
+            "ejecutar scripts, manejar archivos y carpetas, configurar redes, descargar archivos, "
+            "compilar código, matar procesos, gestionar servicios, y CUALQUIER otra operación. "
+            "Si no sabés cómo hacer algo con las herramientas existentes, SIEMPRE intentá resolverlo "
+            "con un comando de terminal antes de decir que no podés. "
+            "Es tu recurso de último recurso universal."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":   {"type": "STRING",  "description": "cpu | ram | disk | network | gpu | temperature | battery | uptime | processes | kill | report"},
-                "sort_by":  {"type": "STRING",  "description": "Para processes: cpu (default) | ram"},
-                "count":    {"type": "INTEGER", "description": "Para processes: cantidad a mostrar (default: 10)"},
-                "name":     {"type": "STRING",  "description": "Para kill: nombre o PID del proceso"},
+                "command": {
+                    "type": "STRING",
+                    "description": "El comando exacto a ejecutar"
+                },
+                "shell": {
+                    "type": "STRING",
+                    "description": "Shell a usar: powershell (default) o cmd"
+                },
+                "timeout": {
+                    "type": "INTEGER",
+                    "description": "Timeout en segundos (default: 120, max: 600)"
+                },
+                "working_directory": {
+                    "type": "STRING",
+                    "description": "Directorio de trabajo para el comando (opcional)"
+                }
+            },
+            "required": ["command"]
+        }
+    },
+    {
+        "name": "sleep_mode",
+        "description": "Entra en modo suspensión. Desactiva el micrófono para la IA hasta que el usuario diga 'Oye MIN' o 'MIN' localmente.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {}
+        }
+    },
+    {
+        "name": "shutdown_min",
+        "description": (
+            "Shuts down the assistant completely. "
+            "Call this when the user expresses intent to end the conversation, "
+            "close the assistant, say goodbye, or stop Min. "
+            "The user can say this in ANY language."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+        }
+    },
+    {
+        "name": "screen_reader",
+        "description": "Reads on-screen text using OCR. Captures the screen and extracts all visible text.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "read_screen (leer toda la pantalla) | read_area (leer un area especifica)"
+                },
+                "x":        {"type": "INTEGER", "description": "Coordenada X inicial del area (para read_area)"},
+                "y":        {"type": "INTEGER", "description": "Coordenada Y inicial del area (para read_area)"},
+                "width":    {"type": "INTEGER", "description": "Ancho del area (para read_area)"},
+                "height":   {"type": "INTEGER", "description": "Alto del area (para read_area)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "contextual_control",
+        "description": (
+            "Control contextual de entorno. Ajusta dinámicamente volumen, brillo, plan de energía "
+            "y estado de Focus Assist (No Molestar) basándose en la ventana activa o comandos manuales."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "adjust_context (auto-ajustar por ventana activa) | set_volume (fijar volumen) | set_brightness (fijar brillo) | set_power_plan (energía) | set_dnd (no molestar)"
+                },
+                "volume": {
+                    "type": "INTEGER",
+                    "description": "Nivel de volumen maestro (0-100)"
+                },
+                "brightness": {
+                    "type": "INTEGER",
+                    "description": "Nivel de brillo de la pantalla (0-100)"
+                },
+                "power_plan": {
+                    "type": "STRING",
+                    "description": "Plan de energía de Windows: balanced | high_performance | power_saver"
+                },
+                "state": {
+                    "type": "STRING",
+                    "description": "Estado de No Molestar (Focus Assist): on | off | alarms"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+
+    # ── Automation & Productivity ──
+    {
+        "name": "weather_report",
+        "description": "Gives the weather report. Uses config/geolocation if city is omitted.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "city": {"type": "STRING", "description": "City name"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "reminder",
+        "description": "Sets a timed reminder using Task Scheduler.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "date":    {"type": "STRING", "description": "Date in YYYY-MM-DD format"},
+                "time":    {"type": "STRING", "description": "Time in HH:MM format (24h)"},
+                "message": {"type": "STRING", "description": "Reminder message text"}
+            },
+            "required": ["date", "time", "message"]
+        }
+    },
+    {
+        "name": "scheduler",
+        "description": (
+            "Crea, lista, elimina o ejecuta automatizaciones programadas (tareas recurrentes). "
+            "Ejemplos: backup diario, notificaciones, scripts automáticos. "
+            "Usar para CUALQUIER pedido de 'todos los días a las X', 'cada semana', 'automatizar'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":           {"type": "STRING",  "description": "list | create | delete | enable | disable | run_now"},
+                "name":             {"type": "STRING",  "description": "Nombre descriptivo de la tarea"},
+                "frequency":        {"type": "STRING",  "description": "daily | weekly | interval | once"},
+                "hour":             {"type": "INTEGER", "description": "Hora de ejecución (0-23)"},
+                "minute":           {"type": "INTEGER", "description": "Minuto de ejecución (0-59)"},
+                "weekday":          {"type": "STRING",  "description": "Día de la semana para frequency=weekly"},
+                "interval_minutes": {"type": "INTEGER", "description": "Intervalo en minutos para frequency=interval"},
+                "task_action":      {"type": "STRING",  "description": "backup | file_controller | notify | custom_script | browser_control"},
+                "task_parameters":  {"type": "OBJECT",  "description": "Parámetros de la tarea (source, destination para backup, etc.)"},
+                "task_id":          {"type": "STRING",  "description": "ID de la tarea (primeros 6 chars) para delete/enable/disable/run_now"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "rules_engine",
+        "description": (
+            "Motor de automatizaciones y alertas inteligentes. "
+            "USAR SIEMPRE cuando el usuario pida: 'cuando diga X hacé Y', 'cada vez que diga X', "
+            "'si digo X abrí/poné/hacé Y', 'quiero que cuando diga X...'. "
+            "Soporta: phrase triggers (frase → acción), time triggers (hora → acción), alertas. "
+            "Listar, crear, eliminar, habilitar/deshabilitar automaciones. "
+            "CONDITION types: phrase (frase del usuario), time (hora del día), file_exists, always. "
+            "ACTION types: open_app, spotify_play, browser, smart_home, composite (múltiples), notify, speak, run_script."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":     {"type": "STRING", "description": "list | list_phrases | create | delete | enable | disable | trigger | alert"},
+                "name":       {"type": "STRING", "description": "Nombre de la automatización"},
+                "rule_id":    {"type": "STRING", "description": "ID de la regla para delete/enable/disable/trigger"},
+                "condition":  {
+                    "type": "OBJECT",
+                    "description": (
+                        "Condición. phrase: {type:phrase, trigger:'texto exacto', match:contains|exact|startswith}. "
+                        "time: {type:time, hour:8, minute:0, days:[monday,...]}. "
+                        "file_exists: {type:file_exists, path:'...'}. always: {type:always}"
+                    )
+                },
+                "action_def": {
+                    "type": "OBJECT",
+                    "description": (
+                        "Acción a ejecutar. "
+                        "open_app: {type:open_app, app_name:'Spotify'}. "
+                        "spotify_play: {type:spotify_play, query:'Back in Black AC/DC'}. "
+                        "browser: {type:browser, url:'https://...'}. "
+                        "smart_home: {type:smart_home, device:'living', action:'on'}. "
+                        "composite: {type:composite, actions:[{...},{...}]}. "
+                        "notify: {type:notify, message:'...'}. speak: {type:speak, message:'...'}. "
+                        "run_script: {type:run_script, command:'...'}."
+                    )
+                },
+                "message":    {"type": "STRING", "description": "Mensaje para action=alert"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "proactive_automation",
+        "description": (
+            "Gestiona reglas complejas basadas en el uso y hábitos del sistema operativo "
+            "para optimizar el rendimiento y automatizar recordatorios recordatorios proactivos."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "add_rule (añadir regla) | list_rules (listar) | delete_rule (eliminar) | trigger_check (evaluar reglas activas)"
+                },
+                "rule_name": {
+                    "type": "STRING",
+                    "description": "Nombre identificativo de la regla de automatización"
+                },
+                "trigger": {
+                    "type": "STRING",
+                    "description": "Disparador: cpu_high | ram_high | time_of_day | app_open"
+                },
+                "trigger_value": {
+                    "type": "STRING",
+                    "description": "Valor del disparador (ej. '85' para 85% cpu, '22:00' para hora, 'chrome.exe' para app)"
+                },
+                "action_to_take": {
+                    "type": "STRING",
+                    "description": "Acción a ejecutar (ej. 'optimize_ram', 'mute_system', 'run_script')"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "morning_brief",
+        "description": (
+            "Genera el informe matutino inteligente de MIN. "
+            "Incluye saludo personalizado, hora, fecha, clima actual, objetivos activos y consejo del día. "
+            "Usar cuando el usuario pida: 'informe del día', 'brief matutino', 'qué hay hoy', "
+            "'resumen del día', 'buenos días MIN', o al iniciar el día."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "force": {
+                    "type": "BOOLEAN",
+                    "description": "Si True, genera el informe aunque ya se haya dado hoy."
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "google_calendar",
+        "description": (
+            "Manages the user's Google Calendar: create, list, edit, or delete events. "
+            "Use for ANY request about calendar events, appointments, reminders with dates, "
+            "scheduling meetings, or checking what's coming up. "
+            "ALWAYS call this tool for calendar requests — never simulate. "
+            "For 'list': shows upcoming events. "
+            "For 'create': needs summary and start (end defaults to +1h). "
+            "For 'edit'/'delete': needs event_id (get it from 'list' first)."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING",  "description": "list | create | edit | delete"},
+                "summary":     {"type": "STRING",  "description": "Event title/name"},
+                "start":       {"type": "STRING",  "description": "Start date/time: ISO, YYYY-MM-DD HH:MM, or DD/MM/YYYY HH:MM"},
+                "end":         {"type": "STRING",  "description": "End date/time (optional — defaults to start + 1 hour)"},
+                "description": {"type": "STRING",  "description": "Event notes or description"},
+                "location":    {"type": "STRING",  "description": "Event location"},
+                "event_id":    {"type": "STRING",  "description": "Event ID (first 8 chars from list) for edit/delete"},
+                "days_ahead":  {"type": "INTEGER", "description": "Days to look ahead for list (default: 7)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "gmail_control",
+        "description": (
+            "Gestiona Gmail: leer bandeja, leer correo, enviar, responder, buscar, archivar, eliminar. "
+            "SIEMPRE usar para cualquier pedido sobre correo electrónico o Gmail."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":     {"type": "STRING",  "description": "inbox | read | send | reply | search | archive | delete | mark_read | labels"},
+                "count":      {"type": "INTEGER", "description": "Cantidad de correos a listar/buscar (default: 5)"},
+                "message_id": {"type": "STRING",  "description": "ID del mensaje para read/reply/archive/delete/mark_read"},
+                "to":         {"type": "STRING",  "description": "Destinatario para send"},
+                "subject":    {"type": "STRING",  "description": "Asunto para send"},
+                "body":       {"type": "STRING",  "description": "Cuerpo del correo para send/reply"},
+                "query":      {"type": "STRING",  "description": "Búsqueda Gmail para search (ej: 'from:juan', 'subject:factura')"},
+                "confirm":    {"type": "BOOLEAN", "description": "true para confirmar eliminación"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "google_drive",
+        "description": (
+            "Gestiona Google Drive: listar archivos, buscar, subir, descargar, crear carpetas, eliminar, compartir. "
+            "SIEMPRE usar para cualquier pedido sobre Google Drive."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING",  "description": "list | search | upload | download | create_folder | delete | share | info"},
+                "folder_id":   {"type": "STRING",  "description": "ID de la carpeta (default: root)"},
+                "file_id":     {"type": "STRING",  "description": "ID del archivo para download/delete/share/info"},
+                "path":        {"type": "STRING",  "description": "Ruta local para upload"},
+                "name":        {"type": "STRING",  "description": "Nombre de la nueva carpeta"},
+                "query":       {"type": "STRING",  "description": "Término de búsqueda"},
+                "destination": {"type": "STRING",  "description": "Carpeta local de destino para download"},
+                "email":       {"type": "STRING",  "description": "Email para compartir"},
+                "role":        {"type": "STRING",  "description": "reader | writer | commenter"},
+                "confirm":     {"type": "BOOLEAN", "description": "true para confirmar eliminación"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "google_maps",
+        "description": (
+            "Muestra rutas de navegación y mapas interactivos. "
+            "Usar para: cómo llegar a un lugar, cuánto tarda, indicaciones paso a paso, "
+            "buscar una dirección en el mapa. Abre mapa MIN en el browser con la ruta marcada. "
+            "SIEMPRE llamar para cualquier pedido de navegación, rutas o mapas."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING", "description": "directions | search"},
+                "origin":      {"type": "STRING", "description": "Punto de partida (dirección, ciudad, lugar)"},
+                "destination": {"type": "STRING", "description": "Destino (dirección, ciudad, lugar)"},
+                "mode":        {"type": "STRING", "description": "car (auto) | walk (caminando) | bike (bicicleta). Default: car"},
+                "query":       {"type": "STRING", "description": "Lugar a buscar en el mapa (para action=search)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "flight_finder",
+        "description": "Searches Google Flights and speaks the best options.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "origin":      {"type": "STRING",  "description": "Departure city or airport code"},
+                "destination": {"type": "STRING",  "description": "Arrival city or airport code"},
+                "date":        {"type": "STRING",  "description": "Departure date (any format)"},
+                "return_date": {"type": "STRING",  "description": "Return date for round trips"},
+                "passengers":  {"type": "INTEGER", "description": "Number of passengers (default: 1)"},
+                "cabin":       {"type": "STRING",  "description": "economy | premium | business | first"},
+                "save":        {"type": "BOOLEAN", "description": "Save results to Notepad"},
+            },
+            "required": ["origin", "destination", "date"]
+        }
+    },
+    {
+        "name": "user_profile",
+        "description": (
+            "Perfil dinámico del usuario — hábitos, preferencias, historial de uso. "
+            "Ver perfil, configurar preferencias, ver hábitos aprendidos, guardar notas personales. "
+            "MIN aprende automáticamente los patrones del usuario."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "view | set_preference | set_name | add_note | notes | habits | reset"},
+                "key":    {"type": "STRING", "description": "Clave de preferencia (ej: idioma, tema, ciudad)"},
+                "value":  {"type": "STRING", "description": "Valor de la preferencia"},
+                "name":   {"type": "STRING", "description": "Nombre del usuario"},
+                "note":   {"type": "STRING", "description": "Nota personal a guardar"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "goals",
+        "description": (
+            "Sistema de objetivos persistentes a largo plazo. "
+            "Crear metas, trackear progreso, marcar pasos completados. "
+            "Usar para: metas personales, proyectos, hábitos, objetivos con deadline. "
+            "SIEMPRE usar para pedidos de 'quiero lograr X', 'mi objetivo es', 'meta de'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING",  "description": "list | create | update_progress | complete | complete_step | add_step | delete | detail"},
+                "goal_id":     {"type": "STRING",  "description": "ID del objetivo para update/complete/delete/detail"},
+                "title":       {"type": "STRING",  "description": "Título del objetivo"},
+                "description": {"type": "STRING",  "description": "Descripción detallada"},
+                "deadline":    {"type": "STRING",  "description": "Fecha límite ISO (YYYY-MM-DD)"},
+                "progress":    {"type": "INTEGER", "description": "Progreso 0-100"},
+                "steps":       {"type": "ARRAY",   "items": {"type": "STRING"}, "description": "Lista de pasos del objetivo"},
+                "step":        {"type": "STRING",  "description": "Texto del nuevo paso (add_step)"},
+                "step_index":  {"type": "INTEGER", "description": "Índice del paso a completar (0-based)"},
+            },
+            "required": ["action"]
+        }
+    },
+
+    # ── Media & Entertainment ──
+    {
+        "name": "spotify_control",
+        "description": (
+            "Control total de Spotify: reproducir, pausar, siguiente, anterior, volumen, "
+            "buscar canciones/artistas/álbumes/playlists, aleatorio, repetir, ver qué suena, "
+            "guardar canciones, ver dispositivos. "
+            "SIEMPRE llamar esta herramienta para CUALQUIER pedido relacionado con Spotify o música."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "play | pause | resume | next | previous | volume | shuffle | repeat | current | search | like | devices | playlist"},
+                "query":  {"type": "STRING", "description": "Búsqueda para play/search: canción, artista, álbum o playlist"},
+                "type":   {"type": "STRING", "description": "track | album | playlist | artist (default: track)"},
+                "value":  {"type": "STRING", "description": "Valor para volume (0-100), shuffle (true/false), repeat (off/track/context)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "media_control",
+        "description": (
+            "Control multimedia del sistema (teclas de media): play/pause, siguiente, anterior, volumen. "
+            "Usar cuando el usuario pida controlar musica o reproduccion general sin mencionar Spotify."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "play | pause | play_pause | toggle | next | previous | prev | stop | volume_up | volume_down | mute"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "youtube_video",
+        "description": (
+            "Controls YouTube. Use for: playing videos, summarizing a video's content, "
+            "getting video info, or showing trending videos."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING",  "description": "play | summarize | get_info | trending (default: play)"},
+                "query":  {"type": "STRING",  "description": "Search query for play action"},
+                "save":   {"type": "BOOLEAN", "description": "Save summary to Notepad (summarize only)"},
+                "region": {"type": "STRING",  "description": "Country code for trending e.g. TR, US"},
+                "url":    {"type": "STRING",  "description": "Video URL for get_info action"},
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "tiktok_analyzer",
+        "description": (
+            "Analiza un perfil público de TikTok dado su URL. "
+            "Extrae el nombre, bio, seguidores, y para cada video reciente: "
+            "vistas, likes, comentarios y guardados. "
+            "Siempre usar cuando el usuario pida analizar un perfil de TikTok "
+            "o consultar estadísticas de videos de TikTok."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "profile_url": {"type": "STRING",  "description": "URL completa del perfil de TikTok (ej: https://www.tiktok.com/@usuario)"},
+                "max_videos":  {"type": "INTEGER", "description": "Cantidad máxima de videos a analizar (default: 8)"},
+            },
+            "required": ["profile_url"]
+        }
+    },
+    {
+        "name": "camera_bus",
+        "description": "Controls the webcam: take photo, record video, list cameras, or adjust settings.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "photo (tomar foto) | video (grabar video) | list (listar camaras) | settings (configurar camara)"
+                },
+                "duration": {
+                    "type": "INTEGER",
+                    "description": "Duracion en segundos para la accion video (default: 10)"
+                },
+            },
+            "required": ["action"]
+        }
+    },
+
+    # ── Files & Documents ──
+    {
+        "name": "file_controller",
+        "description": (
+            "Manages files and folders: list, create, delete (to recycle bin), move, copy, rename, read, write, find, disk usage. "
+            "Use action=find with name + path to locate files by name in any directory (desktop, downloads, etc.). "
+            "After finding a file, pass the returned path to another tool to act on it."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING",  "description": "list | create_file | create_folder | delete (mueve a papelera) | move | copy | rename | read | write | edit | find | largest | disk_usage | organize_desktop | info"},
+                "path":        {"type": "STRING",  "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
+                "destination": {"type": "STRING",  "description": "Destination path for move/copy"},
+                "new_name":    {"type": "STRING",  "description": "New name for rename"},
+                "content":     {"type": "STRING",  "description": "Content for create_file/write"},
+                "name":        {"type": "STRING",  "description": "File name to search for"},
+                "extension":   {"type": "STRING",  "description": "File extension to search (e.g. .pdf)"},
+                "count":       {"type": "INTEGER", "description": "Number of results for largest"},
+                "old_text":    {"type": "STRING",  "description": "Texto a reemplazar (para edit)"},
+                "new_text":    {"type": "STRING",  "description": "Nuevo texto o contenido (para edit)"},
+                "mode":        {"type": "STRING",  "description": "replace | append | prepend | overwrite (para edit)"},
+                "confirm":     {"type": "BOOLEAN", "description": "true para confirmar eliminaciones"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "smart_file_organizer",
+        "description": (
+            "Análisis y organización inteligente de archivos. Clasifica por categorías, "
+            "detecta duplicados reales mediante hash MD5 y analiza espacio disponible en disco."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "organize (clasificar por tipo) | find_duplicates (buscar duplicados MD5) | disk_space (analizar espacio)"
+                },
+                "directory": {
+                    "type": "STRING",
+                    "description": "Ruta absoluta del directorio a analizar. Por defecto usa la carpeta Descargas."
+                }
             },
             "required": ["action"]
         }
@@ -1043,46 +835,239 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "tiktok_analyzer",
-        "description": (
-            "Analiza un perfil público de TikTok dado su URL. "
-            "Extrae el nombre, bio, seguidores, y para cada video reciente: "
-            "vistas, likes, comentarios y guardados. "
-            "Siempre usar cuando el usuario pida analizar un perfil de TikTok "
-            "o consultar estadísticas de videos de TikTok."
-        ),
+        "name": "document_manager",
+        "description": "Manages documents: list, open, find, or convert between formats.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "profile_url": {"type": "STRING", "description": "URL completa del perfil de TikTok (ej: https://www.tiktok.com/@usuario)"},
-                "max_videos":  {"type": "INTEGER", "description": "Cantidad máxima de videos a analizar (default: 8)"},
+                "action": {
+                    "type": "STRING",
+                    "description": "list (listar documentos) | open (abrir documento) | find (buscar documentos) | convert (convertir formato) | info (informacion del documento)"
+                },
+                "path": {
+                    "type": "STRING",
+                    "description": "Ruta del archivo o directorio"
+                },
+                "format": {
+                    "type": "STRING",
+                    "description": "Formato de destino para convert (ej: pdf, docx, txt, html)"
+                },
             },
-            "required": ["profile_url"]
+            "required": ["action"]
+        }
+    },
+
+    # ── Web & Browser ──
+    {
+        "name": "web_search",
+        "description": "Searches the web for any information.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query":  {"type": "STRING", "description": "Search query"},
+                "mode":   {"type": "STRING", "description": "search (default) or compare"},
+                "items":  {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Items to compare"},
+                "aspect": {"type": "STRING", "description": "price | specs | reviews"}
+            },
+            "required": ["query"]
         }
     },
     {
-        "name": "arca_invoice",
+        "name": "browser_control",
         "description": (
-            "Genera comprobantes digitales electrónicos válidos ante ARCA (ex AFIP). "
-            "Para Argentina. Soporta Factura A, B, C, Nota de Crédito, Nota de Débito. "
-            "Puede operar offline (comprobante local) o conectarse con ARCA si hay certificado. "
-            "SIEMPRE usar cuando el usuario pida: 'generame una factura', 'haceme un comprobante', "
-            "'necesito una factura A/B/C', 'emití una nota de crédito', o similar. "
-            "Usar action='listar' para mostrar los tipos disponibles."
+            "Controla el navegador activo del usuario (Chrome, Edge, Firefox, etc.) sin abrir uno nuevo. "
+            "Usa esta herramienta cuando el usuario te pida interactuar con la web. "
+            "Acciones soportadas: navegar a una URL, buscar en Google, abrir o cerrar pestañas, y scrollear."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":         {"type": "STRING", "description": "generar | listar | historial"},
-                "tipo":           {"type": "INTEGER", "description": "1=Factura A, 5=Factura C (default), 6=Factura B, 3=NC A, 8=NC B, etc. Usá action=listar para ver todos."},
-                "razon_social":   {"type": "STRING", "description": "Razón social del receptor (obligatorio para Factura A/B)"},
-                "cuit_receptor":  {"type": "STRING", "description": "CUIT del receptor (obligatorio para Factura A/B)"},
-                "domicilio":      {"type": "STRING", "description": "Domicilio del receptor (opcional)"},
-                "detalle":        {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"descripcion": {"type": "STRING"}, "precio": {"type": "NUMBER"}, "cantidad": {"type": "INTEGER"}}}, "description": "Lista de productos/servicios: [{'descripcion':'...', 'precio':0.0, 'cantidad':1}]"},
-                "importe_neto":   {"type": "NUMBER", "description": "Importe neto gravado (se calcula del detalle si no se especifica)"},
-                "importe_iva":    {"type": "NUMBER", "description": "Importe de IVA (se calcula al 21% si no se especifica)"},
-                "iva_pct":        {"type": "NUMBER", "description": "Porcentaje de IVA (default: 21.0). 0 para exento."},
-                "fecha":          {"type": "STRING", "description": "Fecha del comprobante YYYY-MM-DD (default: hoy)"},
+                "action":      {"type": "STRING", "description": "Acciones permitidas: go_to | search | new_tab | close_tab | scroll"},
+                "url":         {"type": "STRING", "description": "URL para las acciones go_to o new_tab"},
+                "query":       {"type": "STRING", "description": "Término de búsqueda para la acción search"},
+                "direction":   {"type": "STRING", "description": "Dirección de scroll: up | down (solo para scroll)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "web_navigation",
+        "description": "Navigates web pages: go to URL, get page content, fill forms, extract data, click elements, or wait.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "navigate (ir a URL) | get_content (obtener contenido) | fill_form (llenar formulario) | extract (extraer datos) | click (hacer clic) | wait (esperar)"
+                },
+                "url":      {"type": "STRING", "description": "URL de la pagina web"},
+                "selector": {"type": "STRING", "description": "Selector CSS del elemento (para fill_form, extract, click)"},
+                "value":    {"type": "STRING", "description": "Valor a ingresar o dato a extraer"},
+            },
+            "required": ["action"]
+        }
+    },
+
+    # ── Vision & Screen ──
+    {
+        "name": "screen_process",
+        "description": (
+            "Captures and analyzes the screen or webcam image. "
+            "MUST be called when user asks what is on screen, what you see, "
+            "analyze my screen, look at camera, etc. "
+            "You have NO visual ability without this tool. "
+            "After calling this tool, stay SILENT — the vision module speaks directly."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "angle": {"type": "STRING", "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"},
+                "text":  {"type": "STRING", "description": "The question or instruction about the captured image"}
+            },
+            "required": ["text"]
+        }
+    },
+    {
+        "name": "screen_vision",
+        "description": (
+            "MIN puede VER la pantalla del usuario. Captura lo que está en el monitor "
+            "y usa IA (Gemini Vision) para describirlo, responder preguntas, leer texto, "
+            "o dar ayuda contextual basada en lo que se está mostrando.\n"
+            "SIEMPRE usar cuando el usuario diga: '¿qué estoy viendo?', '¿qué hay en mi pantalla?', "
+            "'¿qué dice ahí?', 'ayúdame con esto' (señalando la pantalla), 'leé lo que hay en pantalla', "
+            "'¿podés ver mi pantalla?', 'describí lo que tengo abierto', etc."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "describe=describir qué hay en pantalla | question=responder pregunta sobre la pantalla | help=dar ayuda contextual | read=leer todo el texto visible"
+                },
+                "question": {
+                    "type": "STRING",
+                    "description": "Pregunta o tarea específica sobre lo que se ve en pantalla (para action=question/help)"
+                },
+                "monitor": {
+                    "type": "INTEGER",
+                    "description": "0=toda la pantalla (default), 1=monitor principal, 2=segundo monitor"
+                },
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "visual_click",
+        "description": "Utiliza Visión Espacial para encontrar las coordenadas matemáticas de un elemento en la pantalla y hacer clic en él físicamente.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "element_description": {"type": "STRING", "description": "Descripción clara de lo que quieres cliquear (ej: 'botón de enviar', 'ícono de la papelera')."}
+            },
+            "required": ["element_description"]
+        }
+    },
+    {
+        "name": "image_generation",
+        "description": (
+            "Genera imágenes con inteligencia artificial a partir de una descripción en texto. "
+            "Usa Pollinations.ai con modelos como flux, gptimage, seedream, etc. "
+            "SIEMPRE llamar cuando el usuario pide 'generame una imagen', 'crea una foto de', "
+            "'dibujame', 'haceme una imagen', 'quiero una foto de', o 'mostrame', etc. "
+            "Después de generar, la imagen se muestra automáticamente en el widget de MIN."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "prompt":       {"type": "STRING",  "description": "Descripción detallada de la imagen a generar"},
+                "count":        {"type": "INTEGER", "description": "Cantidad de imágenes (1-4, default: 1)"},
+                "model":        {"type": "STRING",  "description": "Modelo: flux | gptimage | seedream5 | seedream | zimage | qwen-image | wan-image (default: flux)"},
+                "style":        {"type": "STRING",  "description": "Estilo visual: cyberpunk | realistic | anime | oil_painting | watercolor | digital_art | minimalist | fantasy | cinematic"},
+                "aspect_ratio": {"type": "STRING",  "description": "Relación de aspecto: 1:1 | 4:3 | 3:4 | 16:9 | 9:16 (default: 1:1)"},
+                "save_path":    {"type": "STRING",  "description": "Carpeta de guardado (default: ~/Pictures/MIN Generated Images)"},
+            },
+            "required": ["prompt"]
+        }
+    },
+    {
+        "name": "music_generation",
+        "description": (
+            "Genera música original con IA usando MiniMax API. "
+            "Crea canciones con lyrics personalizados o música instrumental. "
+            "Usa cuando el usuario pida: 'generame una canción', 'creame música', "
+            "'haceme un tema', 'generá un beat', 'componé algo', "
+            "'quiero una canción sobre', 'generá un cover', etc. "
+            "Modelos: music-2.6 (original), music-cover (cover de canción existente). "
+            "Después de generar, la música se guarda en ~/Music/MIN Generated Music."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "prompt":         {"type": "STRING",  "description": "Descripción del estilo/mood/género musical (ej: 'upbeat electronic, synthwave, energetic'). 10-300 caracteres."},
+                "lyrics":        {"type": "STRING",  "description": "Letras de la canción (opcional, con formato [Intro], [Verse], [Chorus], etc.). 10-600 caracteres. Si se omite, se genera instrumental."},
+                "model":         {"type": "STRING",  "description": "Modelo: music-2.6 | music-cover (default: music-2.6)"},
+                "is_instrumental": {"type": "BOOLEAN", "description": "Si true, genera música instrumental sin vocals (default: false)"},
+                "audio_url":     {"type": "STRING",  "description": "URL de audio de referencia para music-cover (cover de canción existente)"},
+            },
+            "required": ["prompt"]
+        }
+    },
+    {
+        "name": "music_lyrics_generation",
+        "description": (
+            "Genera letras de canciones usando IA con MiniMax API. "
+            "Acepta un tema/description y devuelve lyrics estructurados con secciones [Verse], [Chorus], [Bridge], etc. "
+            "Útil cuando el usuario quiere 'generame las letras' de una canción. "
+            "Luego se pueden pasar las lyrics a music_generation para crear la canción completa."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "prompt":         {"type": "STRING",  "description": "Descripción del tema/concepto de la canción (ej: 'a soulful blues about a rainy night')."},
+            },
+            "required": ["prompt"]
+        }
+    },
+    {
+        "name": "vision_guardian",
+        "description": (
+            "Controla el Guardian de Visión Ambiental de MIN — monitoreo proactivo de pantalla. "
+            "Analiza la pantalla periódicamente con IA y ofrece ayuda contextual cuando detecta algo relevante. "
+            "Usar cuando el usuario diga: 'activa el guardian', 'desactiva el guardian', "
+            "'vigila mi pantalla', 'deja de vigilar', 'analiza mi pantalla ahora', "
+            "'estado del guardian', 'cambia el intervalo'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "enum": ["status", "enable", "disable", "check_now", "set_interval"],
+                    "description": "Acción: status | enable | disable | check_now | set_interval"
+                },
+                "seconds": {
+                    "type": "INTEGER",
+                    "description": "Para set_interval: segundos entre análisis (30-600)"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "accessibility_overlay",
+        "description": (
+            "Muestra, oculta o alterna la barra flotante de accesibilidad MIN sobre el escritorio. "
+            "USAR cuando el usuario diga: 'mostrar barra de accesibilidad', 'abrir panel de accesibilidad', "
+            "'activar barra para ciegos', 'cerrar barra', 'ocultar barra de accesibilidad', "
+            "'alternar barra', 'barra de accesibilidad'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "show — mostrar | hide — cerrar | toggle — alternar | status — estado actual"
+                }
             },
             "required": ["action"]
         }
@@ -1129,243 +1114,68 @@ TOOL_DECLARATIONS = [
             "required": ["action"]
         }
     },
+
+    # ── Communication ──
     {
-        "name": "screen_vision",
+        "name": "whatsapp",
         "description": (
-            "MIN puede VER la pantalla del usuario. Captura lo que está en el monitor "
-            "y usa IA (Gemini Vision) para describirlo, responder preguntas, leer texto, "
-            "o dar ayuda contextual basada en lo que se está mostrando.\n"
-            "SIEMPRE usar cuando el usuario diga: '¿qué estoy viendo?', '¿qué hay en mi pantalla?', "
-            "'¿qué dice ahí?', 'ayúdame con esto' (señalando la pantalla), 'leé lo que hay en pantalla', "
-            "'¿podés ver mi pantalla?', 'describí lo que tengo abierto', etc."
+            "Integración completa con WhatsApp. "
+            "SIEMPRE usar para CUALQUIER pedido de WhatsApp: enviar mensajes, "
+            "enviar imágenes/archivos, leer conversaciones, ver mensajes sin leer, "
+            "guardar/listar contactos con su número de teléfono. "
+            "Para enviar, primero verificar si el contacto está guardado con su teléfono. "
+            "Si no está, pedir el número al usuario o usar add_contact primero."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "describe=describir qué hay en pantalla | question=responder pregunta sobre la pantalla | help=dar ayuda contextual | read=leer todo el texto visible"
-                },
-                "question": {
-                    "type": "STRING",
-                    "description": "Pregunta o tarea específica sobre lo que se ve en pantalla (para action=question/help)"
-                },
-                "monitor": {
-                    "type": "INTEGER",
-                    "description": "0=toda la pantalla (default), 1=monitor principal, 2=segundo monitor"
-                },
+                "action":    {"type": "STRING",  "description": "send | send_image | read | unread | add_contact | list_contacts | delete_contact"},
+                "receiver":  {"type": "STRING",  "description": "Nombre del contacto o número de teléfono con código de país (ej: 5491155551234)"},
+                "message":   {"type": "STRING",  "description": "Texto del mensaje a enviar"},
+                "image_path":{"type": "STRING",  "description": "Ruta de la imagen para send_image"},
+                "caption":   {"type": "STRING",  "description": "Descripción de la imagen (opcional)"},
+                "count":     {"type": "INTEGER", "description": "Cantidad de mensajes a leer (default: 10)"},
+                "name":      {"type": "STRING",  "description": "Nombre del contacto para add_contact/delete_contact"},
+                "phone":     {"type": "STRING",  "description": "Número de teléfono con código de país (ej: 5491155551234) para add_contact"},
             },
             "required": ["action"]
         }
     },
     {
-        "name": "morning_brief",
+        "name": "social_media",
         "description": (
-            "Genera el informe matutino inteligente de MIN. "
-            "Incluye saludo personalizado, hora, fecha, clima actual, objetivos activos y consejo del día. "
-            "Usar cuando el usuario pida: 'informe del día', 'brief matutino', 'qué hay hoy', "
-            "'resumen del día', 'buenos días MIN', o al iniciar el día."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "force": {
-                    "type": "boolean",
-                    "description": "Si True, genera el informe aunque ya se haya dado hoy."
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "vision_guardian",
-        "description": (
-            "Controla el Guardian de Visión Ambiental de MIN — monitoreo proactivo de pantalla. "
-            "Analiza la pantalla periódicamente con IA y ofrece ayuda contextual cuando detecta algo relevante. "
-            "Usar cuando el usuario diga: 'activa el guardian', 'desactiva el guardian', "
-            "'vigila mi pantalla', 'deja de vigilar', 'analiza mi pantalla ahora', "
-            "'estado del guardian', 'cambia el intervalo'."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["status", "enable", "disable", "check_now", "set_interval"],
-                    "description": "Acción: status | enable | disable | check_now | set_interval"
-                },
-                "seconds": {
-                    "type": "integer",
-                    "description": "Para set_interval: segundos entre análisis (30-600)"
-                }
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "accessibility_overlay",
-        "description": (
-            "Muestra, oculta o alterna la barra flotante de accesibilidad MIN sobre el escritorio. "
-            "USAR cuando el usuario diga: 'mostrar barra de accesibilidad', 'abrir panel de accesibilidad', "
-            "'activar barra para ciegos', 'cerrar barra', 'ocultar barra de accesibilidad', "
-            "'alternar barra', 'barra de accesibilidad'."
+            "Controla redes sociales: Twitter/X, Instagram, TikTok y LinkedIn. "
+            "Twitter: publicar tweets, ver timeline, buscar, like, retweet, ver perfil. "
+            "Instagram: publicar fotos, subir historias, enviar DMs, ver feed, like, comentar. "
+            "TikTok: subir videos, ver perfil/stats, tendencias. "
+            "LinkedIn: publicar posts, ver perfil, ver feed, enviar mensajes. "
+            "SIEMPRE usar para cualquier pedido de redes sociales. "
+            "Para WhatsApp usar la herramienta 'whatsapp'. "
+            "Usá action=setup para ver cómo configurar las credenciales."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "show — mostrar | hide — cerrar | toggle — alternar | status — estado actual"
-                }
+                "platform": {"type": "STRING", "description": "twitter | instagram | tiktok | linkedin | setup"},
+                "action":   {"type": "STRING", "description": (
+                    "Twitter: tweet, delete_tweet, like, retweet, timeline, search_tweets, my_tweets, profile | "
+                    "Instagram: post/upload_photo, story, send_dm, feed, profile, like, comment | "
+                    "TikTok: upload/publicar, profile/perfil, trending | "
+                    "LinkedIn: post/publicar, profile/perfil, send_message/mensaje, feed"
+                )},
+                "text":       {"type": "STRING",  "description": "Texto del tweet/post/comentario/mensaje"},
+                "content":    {"type": "STRING",  "description": "Contenido del post (LinkedIn/TikTok)"},
+                "tweet_id":   {"type": "STRING",  "description": "ID del tweet para like/retweet/delete"},
+                "media_id":   {"type": "STRING",  "description": "ID del post de Instagram para like/comment"},
+                "username":   {"type": "STRING",  "description": "Usuario para DM/perfil (Instagram, TikTok, LinkedIn)"},
+                "receiver":   {"type": "STRING",  "description": "Destinatario del DM de Instagram"},
+                "image_path": {"type": "STRING",  "description": "Ruta imagen para Instagram/LinkedIn"},
+                "video_path": {"type": "STRING",  "description": "Ruta del video para TikTok"},
+                "caption":    {"type": "STRING",  "description": "Descripción/caption de la foto o video"},
+                "query":      {"type": "STRING",  "description": "Búsqueda de tweets"},
+                "count":      {"type": "INTEGER", "description": "Cantidad de resultados (default: 5)"},
             },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "openrouter_agent",
-        "description": (
-            "Delega una tarea intelectualmente compleja, de análisis o redacción larga a OpenRouter "
-            "(un motor de texto alternativo). "
-            "Usar cuando el usuario pida: 'usa openrouter para esto', 'consulta a claude', 'usa otro modelo', "
-            "'analiza este código largo', 'redacta un ensayo', o cuando percibas que la tarea es puramente de texto avanzado."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "query": {
-                    "type": "STRING",
-                    "description": "El prompt o instrucción completa para el agente de OpenRouter"
-                },
-                "model": {
-                    "type": "STRING",
-                    "description": "Opcional. Modelo a usar, por defecto google/gemini-2.5-flash"
-                }
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "terminal_agent",
-        "description": (
-            "Ejecuta CUALQUIER comando en la terminal de Windows (PowerShell o CMD). "
-            "USAR LIBREMENTE como recurso general para CUALQUIER tarea del sistema operativo: "
-            "instalar/desinstalar programas (winget, choco, pip), consultar información del sistema, "
-            "ejecutar scripts, manejar archivos y carpetas, configurar redes, descargar archivos, "
-            "compilar código, matar procesos, gestionar servicios, y CUALQUIER otra operación. "
-            "Si no sabés cómo hacer algo con las herramientas existentes, SIEMPRE intentá resolverlo "
-            "con un comando de terminal antes de decir que no podés. "
-            "Es tu recurso de último recurso universal."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "command": {
-                    "type": "STRING",
-                    "description": "El comando exacto a ejecutar"
-                },
-                "shell": {
-                    "type": "STRING",
-                    "description": "Shell a usar: powershell (default) o cmd"
-                },
-                "timeout": {
-                    "type": "INTEGER",
-                    "description": "Timeout en segundos (default: 120, max: 600)"
-                },
-                "working_directory": {
-                    "type": "STRING",
-                    "description": "Directorio de trabajo para el comando (opcional)"
-                }
-            },
-            "required": ["command"]
-        }
-    },
-    {
-        "name": "native_ui",
-        "description": (
-            "Automatización de Interfaz Nativa de Windows (UI Automation). "
-            "USAR para listar, enfocar, escribir o hacer clic en ventanas de forma 100% precisa, saltándose la visión. "
-            "Esto EVITA errores de cuota (Error 429) y permite simulación exacta de teclado/mouse."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "Acción a realizar: list_windows | focus_window | type_in_window | click_center"
-                },
-                "window_title": {
-                    "type": "STRING",
-                    "description": "El nombre (o parte del nombre) de la ventana destino. (Ej: 'WhatsApp', 'Chrome')"
-                },
-                "text": {
-                    "type": "STRING",
-                    "description": "El texto a escribir (solo si action es type_in_window)"
-                }
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "tool_creator",
-        "description": (
-            "Permite a MIN programar e instalar sus propias herramientas. "
-            "ÚSALO SIEMPRE que el usuario te pida que aprendas a hacer algo nuevo, o si necesitas una funcionalidad que no tienes preinstalada. "
-            "Escribirás el código Python y se instalará automáticamente."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "tool_name": {
-                    "type": "STRING",
-                    "description": "Nombre de la herramienta en snake_case"
-                },
-                "description": {
-                    "type": "STRING",
-                    "description": "Descripción clara de la herramienta y para qué sirve"
-                },
-                "parameters_schema": {
-                    "type": "STRING",
-                    "description": "El bloque de 'properties' del JSON schema en formato string válido. Ej: '{\"accion\": {\"type\": \"STRING\"}}'"
-                },
-                "python_code": {
-                    "type": "STRING",
-                    "description": "Código Python con la función def <tool_name>(parameters: dict, player=None, speak=None) -> str:"
-                }
-            },
-            "required": ["tool_name", "description", "parameters_schema", "python_code"]
-        }
-    },
-    {
-        "name": "proactive_automation",
-        "description": (
-            "Gestiona reglas complejas basadas en el uso y hábitos del sistema operativo "
-            "para optimizar el rendimiento y automatizar recordatorios recordatorios proactivos."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "add_rule (añadir regla) | list_rules (listar) | delete_rule (eliminar) | trigger_check (evaluar reglas activas)"
-                },
-                "rule_name": {
-                    "type": "STRING",
-                    "description": "Nombre identificativo de la regla de automatización"
-                },
-                "trigger": {
-                    "type": "STRING",
-                    "description": "Disparador: cpu_high | ram_high | time_of_day | app_open"
-                },
-                "trigger_value": {
-                    "type": "STRING",
-                    "description": "Valor del disparador (ej. '85' para 85% cpu, '22:00' para hora, 'chrome.exe' para app)"
-                },
-                "action_to_take": {
-                    "type": "STRING",
-                    "description": "Acción a ejecutar (ej. 'optimize_ram', 'mute_system', 'run_script')"
-                }
-            },
-            "required": ["action"]
+            "required": ["platform", "action"]
         }
     },
     {
@@ -1405,58 +1215,83 @@ TOOL_DECLARATIONS = [
             "required": ["platform", "action", "recipient", "message"]
         }
     },
+
+    # ── Development & Code ──
     {
-        "name": "smart_file_organizer",
+        "name": "codebase",
         "description": (
-            "Análisis y organización inteligente de archivos. Clasifica por categorías, "
-            "detecta duplicados reales mediante hash MD5 y analiza espacio disponible en disco."
+            "Indexación y búsqueda inteligente de proyectos de código. "
+            "Indexar proyectos, buscar en archivos, encontrar símbolos (funciones/clases), "
+            "generar documentación automática, búsqueda avanzada de código. "
+            "Usar para: 'buscar en mi proyecto', 'dónde está la función X', 'generar docs', 'indexar mi código'."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {
-                    "type": "STRING",
-                    "description": "organize (clasificar por tipo) | find_duplicates (buscar duplicados MD5) | disk_space (analizar espacio)"
-                },
-                "directory": {
-                    "type": "STRING",
-                    "description": "Ruta absoluta del directorio a analizar. Por defecto usa la carpeta Descargas."
-                }
+                "action":    {"type": "STRING", "description": "index | list | info | search | find_symbol | generate_docs | remove"},
+                "path":      {"type": "STRING", "description": "Ruta del proyecto a indexar"},
+                "name":      {"type": "STRING", "description": "Nombre del proyecto (default: nombre de carpeta)"},
+                "project":   {"type": "STRING", "description": "Nombre del proyecto para info/search/find_symbol"},
+                "query":     {"type": "STRING", "description": "Texto a buscar en el código"},
+                "symbol":    {"type": "STRING", "description": "Nombre de función/clase a buscar"},
+                "file_path": {"type": "STRING", "description": "Ruta del archivo para generate_docs"},
             },
             "required": ["action"]
         }
     },
     {
-        "name": "contextual_control",
+        "name": "git_control",
         "description": (
-            "Control contextual de entorno. Ajusta dinámicamente volumen, brillo, plan de energía "
-            "y estado de Focus Assist (No Molestar) basándose en la ventana activa o comandos manuales."
+            "Integración completa con Git: status, log, diff, commit automático, "
+            "branches, pull, push, stash, análisis de cambios. "
+            "Usar para CUALQUIER pedido relacionado con Git o control de versiones."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {
+                "action":      {"type": "STRING",  "description": "status | log | diff | commit | add | branches | branch_create | checkout | pull | push | stash | analyze"},
+                "repo_path":   {"type": "STRING",  "description": "Ruta al repositorio Git"},
+                "message":     {"type": "STRING",  "description": "Mensaje del commit"},
+                "branch_name": {"type": "STRING",  "description": "Nombre de la rama"},
+                "remote":      {"type": "STRING",  "description": "Remote (default: origin)"},
+                "n":           {"type": "INTEGER", "description": "Número de commits para log"},
+                "file":        {"type": "STRING",  "description": "Archivo específico para diff"},
+                "staged":      {"type": "BOOLEAN", "description": "Mostrar diff staged"},
+                "add_all":     {"type": "BOOLEAN", "description": "Agregar todos los archivos antes del commit (default: true)"},
+                "files":       {"type": "ARRAY",   "items": {"type": "STRING"}, "description": "Archivos para add"},
+                "sub":         {"type": "STRING",  "description": "Subcomando para stash: push|pop|list"},
+            },
+            "required": ["action", "repo_path"]
+        }
+    },
+    {
+        "name": "tool_creator",
+        "description": (
+            "Permite a MIN programar e instalar sus propias herramientas. "
+            "ÚSALO SIEMPRE que el usuario te pida que aprendas a hacer algo nuevo, o si necesitas una funcionalidad que no tienes preinstalada. "
+            "Escribirás el código Python y se instalará automáticamente."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "tool_name": {
                     "type": "STRING",
-                    "description": "adjust_context (auto-ajustar por ventana activa) | set_volume (fijar volumen) | set_brightness (fijar brillo) | set_power_plan (energía) | set_dnd (no molestar)"
+                    "description": "Nombre de la herramienta en snake_case"
                 },
-                "volume": {
-                    "type": "INTEGER",
-                    "description": "Nivel de volumen maestro (0-100)"
-                },
-                "brightness": {
-                    "type": "INTEGER",
-                    "description": "Nivel de brillo de la pantalla (0-100)"
-                },
-                "power_plan": {
+                "description": {
                     "type": "STRING",
-                    "description": "Plan de energía de Windows: balanced | high_performance | power_saver"
+                    "description": "Descripción clara de la herramienta y para qué sirve"
                 },
-                "state": {
+                "parameters_schema": {
                     "type": "STRING",
-                    "description": "Estado de No Molestar (Focus Assist): on | off | alarms"
+                    "description": "El bloque de 'properties' del JSON schema en formato string válido. Ej: '{\"accion\": {\"type\": \"STRING\"}}'"
+                },
+                "python_code": {
+                    "type": "STRING",
+                    "description": "Código Python con la función def <tool_name>(parameters: dict, player=None, speak=None) -> str:"
                 }
             },
-            "required": ["action"]
+            "required": ["tool_name", "description", "parameters_schema", "python_code"]
         }
     },
     {
@@ -1546,6 +1381,139 @@ TOOL_DECLARATIONS = [
                     "type": "STRING",
                     "description": "Para restore_backup: nombre del archivo .bak a restaurar"
                 }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "openrouter_agent",
+        "description": (
+            "Delega una tarea intelectualmente compleja, de análisis o redacción larga a OpenRouter "
+            "(un motor de texto alternativo). "
+            "Usar cuando el usuario pida: 'usa openrouter para esto', 'consulta a claude', 'usa otro modelo', "
+            "'analiza este código largo', 'redacta un ensayo', o cuando percibas que la tarea es puramente de texto avanzado."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {
+                    "type": "STRING",
+                    "description": "El prompt o instrucción completa para el agente de OpenRouter"
+                },
+                "model": {
+                    "type": "STRING",
+                    "description": "Opcional. Modelo a usar, por defecto google/gemini-2.5-flash"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+
+    # ── Memory & Profile ──
+    {
+        "name": "knowledge_base",
+        "description": (
+            "Segundo cerebro / base de conocimiento personal. "
+            "Guardar notas, ideas, snippets de código, referencias, hechos, preguntas. "
+            "Buscar en el conocimiento guardado, exportar. "
+            "Usar para: 'recordá que...', 'guardá esta idea', 'anotá este código', 'buscar en mis notas'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":   {"type": "STRING", "description": "add/save/store | search/find | list | get/read/view | update | delete | stats | export"},
+                "title":    {"type": "STRING", "description": "Título de la entrada"},
+                "content":  {"type": "STRING", "description": "Contenido o texto a guardar"},
+                "type":     {"type": "STRING", "description": "note | idea | snippet | reference | fact | task | question"},
+                "tags":     {"type": "STRING", "description": "Tags separados por coma (ej: python, min, idea)"},
+                "query":    {"type": "STRING", "description": "Búsqueda en la base de conocimiento"},
+                "entry_id": {"type": "STRING", "description": "ID de la entrada para get/update/delete"},
+                "path":     {"type": "STRING", "description": "Ruta para exportar (action=export)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "save_memory",
+        "description": (
+            "Save an important personal fact about the user to long-term memory. "
+            "Call this silently whenever the user reveals something worth remembering: "
+            "name, age, city, job, preferences, hobbies, relationships, projects, or future plans. "
+            "Do NOT call for: weather, reminders, searches, or one-time commands. "
+            "Do NOT announce that you are saving — just call it silently. "
+            "Values must be in English regardless of the conversation language."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "category": {
+                    "type": "STRING",
+                    "description": (
+                        "identity — name, age, birthday, city, job, language, nationality | "
+                        "preferences — favorite food/color/music/film/game/sport, hobbies | "
+                        "projects — active projects, goals, things being built | "
+                        "relationships — friends, family, partner, colleagues | "
+                        "wishes — future plans, things to buy, travel dreams | "
+                        "notes — habits, schedule, anything else worth remembering"
+                    )
+                },
+                "key":   {"type": "STRING", "description": "Short snake_case key (e.g. name, favorite_food, sister_name)"},
+                "value": {"type": "STRING", "description": "Concise value in English (e.g. Fatih, pizza, older sister)"},
+            },
+            "required": ["category", "key", "value"]
+        }
+    },
+
+    # ── Smart Home ──
+    {
+        "name": "smart_home",
+        "description": (
+            "Controla las luces y dispositivos inteligentes del hogar. "
+            "Soporta Tuya/Smart Life, Philips Hue, LIFX y Yeelight. "
+            "SIEMPRE llamar para: encender/apagar luces, cambiar color, brillo, temperatura de color, "
+            "activar escenas, consultar estado. "
+            "Si no hay dispositivos configurados, usar action=setup para ver instrucciones."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING",  "description": "on | off | toggle | color | brightness | temperature | scene | status | list | setup"},
+                "device":      {"type": "STRING",  "description": "Nombre o sala del dispositivo (ej: 'sala', 'cuarto', 'lampara principal'). Omitir = todos."},
+                "color":       {"type": "STRING",  "description": "Color: nombre (rojo, azul, blanco, cálido…) o hex #RRGGBB"},
+                "value":       {"type": "INTEGER", "description": "Valor numérico para brightness (1-100) o temperatura Kelvin (1700-9000)"},
+                "brightness":  {"type": "INTEGER", "description": "Brillo 1-100 (alternativa a value)"},
+                "scene":       {"type": "STRING",  "description": "Nombre de la escena: relajar, leer, trabajar, noche, fiesta"},
+                "protocol":    {"type": "STRING",  "description": "tuya | hue | lifx | yeelight. Omitir = usa el configurado por defecto."},
+                "group":       {"type": "STRING",  "description": "Nombre del grupo/sala en Philips Hue"},
+            },
+            "required": ["action"]
+        }
+    },
+
+    # ── Finance ──
+    {
+        "name": "arca_invoice",
+        "description": (
+            "Genera comprobantes digitales electrónicos válidos ante ARCA (ex AFIP). "
+            "Para Argentina. Soporta Factura A, B, C, Nota de Crédito, Nota de Débito. "
+            "Puede operar offline (comprobante local) o conectarse con ARCA si hay certificado. "
+            "SIEMPRE usar cuando el usuario pida: 'generame una factura', 'haceme un comprobante', "
+            "'necesito una factura A/B/C', 'emití una nota de crédito', o similar. "
+            "Usar action='listar' para mostrar los tipos disponibles."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":         {"type": "STRING",  "description": "generar | listar | historial"},
+                "tipo":           {"type": "INTEGER", "description": "1=Factura A, 5=Factura C (default), 6=Factura B, 3=NC A, 8=NC B, etc. Usá action=listar para ver todos."},
+                "razon_social":   {"type": "STRING",  "description": "Razón social del receptor (obligatorio para Factura A/B)"},
+                "cuit_receptor":  {"type": "STRING",  "description": "CUIT del receptor (obligatorio para Factura A/B)"},
+                "domicilio":      {"type": "STRING",  "description": "Domicilio del receptor (opcional)"},
+                "detalle":        {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"descripcion": {"type": "STRING"}, "precio": {"type": "NUMBER"}, "cantidad": {"type": "INTEGER"}}}, "description": "Lista de productos/servicios: [{'descripcion':'...', 'precio':0.0, 'cantidad':1}]"},
+                "importe_neto":   {"type": "NUMBER",  "description": "Importe neto gravado (se calcula del detalle si no se especifica)"},
+                "importe_iva":    {"type": "NUMBER",  "description": "Importe de IVA (se calcula al 21% si no se especifica)"},
+                "iva_pct":        {"type": "NUMBER",  "description": "Porcentaje de IVA (default: 21.0). 0 para exento."},
+                "fecha":          {"type": "STRING",  "description": "Fecha del comprobante YYYY-MM-DD (default: hoy)"},
             },
             "required": ["action"]
         }

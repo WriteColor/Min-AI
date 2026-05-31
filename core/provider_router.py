@@ -53,21 +53,21 @@ class ProviderRouter:
         self._initialize_default_routes()
     
     def _initialize_default_routes(self):
-        """Initialize default routing configuration."""
+        """Initialize default routing configuration with free/open model preference."""
         self._default_routes = {
             TaskType.GENERAL_REASONING: ProviderRoute(
                 provider_name="gemini",
-                model_name="gemini-2.5-pro",
+                model_name="gemini-2.5-flash",
                 capabilities=[ProviderCapability.TEXT, ProviderCapability.VISION, ProviderCapability.TOOL_CALL],
                 fallback_provider="openrouter",
-                fallback_model="google/gemini-2.5-flash"
+                fallback_model="google/gemini-2.5-flash:free"
             ),
             TaskType.VISION: ProviderRoute(
                 provider_name="gemini",
                 model_name="gemini-2.5-flash",
                 capabilities=[ProviderCapability.VISION, ProviderCapability.TEXT],
                 fallback_provider="openrouter",
-                fallback_model="openai/gpt-4o"
+                fallback_model="openai/gpt-4o-mini"
             ),
             TaskType.VOICE_REALTIME: ProviderRoute(
                 provider_name="gemini",
@@ -85,10 +85,10 @@ class ProviderRouter:
             ),
             TaskType.CODE_GENERATION: ProviderRoute(
                 provider_name="openrouter",
-                model_name="openai/gpt-4o",
+                model_name="google/gemini-2.5-flash:free",
                 capabilities=[ProviderCapability.TEXT, ProviderCapability.TOOL_CALL],
                 fallback_provider="gemini",
-                fallback_model="gemini-2.5-pro"
+                fallback_model="gemini-2.5-flash"
             ),
             TaskType.IMAGE_GENERATION: ProviderRoute(
                 provider_name="pollinations",
@@ -99,10 +99,10 @@ class ProviderRouter:
             ),
             TaskType.LONG_CONTEXT: ProviderRoute(
                 provider_name="gemini",
-                model_name="gemini-2.5-pro",
+                model_name="gemini-2.5-flash",
                 capabilities=[ProviderCapability.TEXT],
                 fallback_provider="openrouter",
-                fallback_model="anthropic/claude-3.5-sonnet"
+                fallback_model="google/gemini-2.5-flash:free"
             ),
             TaskType.CREATIVE: ProviderRoute(
                 provider_name="gemini",
@@ -113,10 +113,10 @@ class ProviderRouter:
             ),
             TaskType.ANALYTICAL: ProviderRoute(
                 provider_name="gemini",
-                model_name="gemini-2.5-pro",
+                model_name="gemini-2.5-flash",
                 capabilities=[ProviderCapability.TEXT, ProviderCapability.REASONING],
                 fallback_provider="openrouter",
-                fallback_model="anthropic/claude-3.5-sonnet"
+                fallback_model="google/gemini-2.5-flash:free"
             ),
         }
     

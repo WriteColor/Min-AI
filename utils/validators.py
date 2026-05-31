@@ -12,7 +12,7 @@ Proporciona:
 """
 
 from typing import Any, List, Optional, Callable, Union, Type
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import re
 
@@ -22,7 +22,7 @@ class ValidationResult:
     """Resultado de una validación."""
     valid: bool
     error: Optional[str] = None
-    warnings: List[str] = []
+    warnings: List[str] = field(default_factory=list)
 
 
 class Validator:

@@ -3,7 +3,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 API_FILE = BASE_DIR / "config" / "config.json"
 
 def _get_api_key() -> str:
@@ -17,14 +17,14 @@ def _get_api_key() -> str:
 
 def _get_default_model() -> str:
     if not API_FILE.exists():
-        return "google/gemini-2.5-flash"
+        return "google/gemini-2.5-flash:free"
     try:
         data = json.loads(API_FILE.read_text(encoding="utf-8"))
-        return data.get("openrouter_default_model", "google/gemini-2.5-flash")
+        return data.get("openrouter_default_model", "google/gemini-2.5-flash:free")
     except Exception:
-        return "google/gemini-2.5-flash"
+        return "google/gemini-2.5-flash:free"
 
-def openrouter_agent(query: str, model: str = "google/gemini-2.5-flash") -> str:
+def openrouter_agent(query: str, model: str = "google/gemini-2.5-flash:free") -> str:
     """
     Delega una tarea de texto compleja a OpenRouter usando el modelo especificado.
     """

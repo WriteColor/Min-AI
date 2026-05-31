@@ -86,6 +86,26 @@ COMPATIBLE_COMBINATIONS: Dict[str, Dict[str, List[str]]] = {
             "abab6.5g-chat"
         ]
     },
+    "ollama_cloud": {
+        "text": [
+            "nemotron-3-super:cloud",
+            "gemma4:31b-cloud",
+            "llama3.2:70b-cloud",
+            "qwen2.5:72b-cloud",
+            "mistral-nemo:12b-cloud"
+        ]
+    },
+    "nvidia_nim": {
+        "text": [
+            "meta/llama-3.1-405b-instruct",
+            "meta/llama-3.1-70b-instruct",
+            "meta/llama-3.1-8b-instruct",
+            "mistralai/mixtral-8x7b-instruct-v0.1",
+            "mistralai/mistral-7b-instruct-v0.3",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "google/gemma-2-27b-instruct"
+        ]
+    },
     "openai": {
         "text": [
             "gpt-4o",

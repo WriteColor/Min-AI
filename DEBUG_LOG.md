@@ -104,7 +104,6 @@
    - **Descripción:** Try/except vazíos o muy amplios que ocultan errores
    - **Impacto:** Fallos silenciosos difíciles de debuggear
    - **Prioridad:** Alta
-   - **Referencia:** Área 5.5 del plan
 
 3. **[IMP-003]** Cache adaptativo para ventanas
    - **Descripción:** Cache con timeout fijo (5 segundos) no considera carga del sistema
@@ -120,7 +119,6 @@
 5. **[IMP-005]** Implementar fallback para control de volumen
    - **Descripción:** Cuando pycaw falla, usar ctypes directo a Windows Core Audio API
    - **Prioridad:** Media
-   - **Referencia:** Área 5.12 del plan
 
 ---
 
@@ -136,7 +134,6 @@
 - [x] 2025-05-28: Fix BUG-005 (Unicode symbols)
 - [ ] 2025-05-28: Fix BUG-003 (pycaw alternative)
 - [ ] 2025-05-28: Unificación de implementaciones Win32
-- [ ] 2025-05-28: Actualización de PLAN_DE_IMPLEMENTACION.md con bugs/mejoras
 
 ---
 

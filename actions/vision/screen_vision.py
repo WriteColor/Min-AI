@@ -33,7 +33,7 @@ def _capture_screen_base64(save_path: Path = None) -> str:
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
         
         # Redimensionar si es muy grande para ahorrar tokens/ancho de banda
-        max_size = (1280, 720)
+        max_size = (800, 600)
         img.thumbnail(max_size, Image.Resampling.BILINEAR)
         
         # Guardar en archivo local para que el usuario pueda verlo si lo solicita
@@ -189,7 +189,7 @@ def screen_vision(parameters: dict, player=None) -> str:
             }
             
             payload = {
-                "model": "google/gemini-2.5-flash",
+                "model": "google/gemini-2.5-flash:free",
                 "max_tokens": 1500,
                 "messages": [
                     {
@@ -254,7 +254,7 @@ def screen_vision(parameters: dict, player=None) -> str:
                 player.write_log("[Visión Fallback] Intentando recuperar con OpenRouter...")
             url = "https://openrouter.ai/api/v1/chat/completions"
             headers = {"Authorization": f"Bearer {openrouter_key}", "HTTP-Referer": "https://github.com/jarvis-beta", "X-Title": "JARVIS AI Assistant", "Content-Type": "application/json"}
-            payload = {"model": "google/gemini-2.5-flash", "max_tokens": 1500, "messages": [{"role": "user", "content": [{"type": "text", "text": f"Esta es una captura de mi pantalla. {query}"}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}]}]}
+            payload = {"model": "google/gemini-2.5-flash:free", "max_tokens": 1500, "messages": [{"role": "user", "content": [{"type": "text", "text": f"Esta es una captura de mi pantalla. {query}"}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}]}]}
             req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=45) as response:
                 response_data = json.loads(response.read().decode("utf-8"))

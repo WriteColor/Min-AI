@@ -36,13 +36,35 @@ class AppConfig:
     active_model: str = "gemini-2.5-flash"
     live_model: str = ""
     vision_model: str = ""
-    openrouter_default_model: str = "google/gemini-2.5-flash"
+    openrouter_default_model: str = "google/gemini-2.5-flash:free"
     
-    # Local LLM settings
-    local_openai_base_url: str = "http://127.0.0.1:1337/v1"
-    local_openai_model: str = "mistral-7b-instruct"
-    local_openai_api_key: str = ""
-    local_openai_reasoning: bool = False
+    # Pollinations.ai settings
+    pollinations_api_key: str = ""
+    pollinations_default_model: str = "flux"
+    pollinations_image_width: int = 1024
+    pollinations_image_height: int = 1024
+
+    # MiniMax API settings
+    minimax_api_key: str = ""
+    minimax_music_model: str = "music-2.6"
+    minimax_music_output_dir: str = "~/Music/MIN Generated Music"
+    minimax_llm_model: str = "MiniMax-M2.7"
+
+    # Ollama Cloud settings (cloud.ollama.com - hosted models)
+    ollama_cloud_api_key: str = ""
+    ollama_cloud_base_url: str = "https://cloud.ollama.com/v1"
+    ollama_cloud_model: str = "nemotron-3-super:cloud"
+
+    # NVIDIA NIM settings (integrate.api.nvidia.com - AI Foundation Models)
+    nvidia_nim_api_key: str = ""
+    nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_nim_model: str = "meta/llama-3.1-70b-instruct"
+
+    # Compatible Local LLM settings (OpenAI-compatible local endpoints like Ollama, LM Studio, Jan AI, etc.)
+    compatible_local_openai_base_url: str = "http://127.0.0.1:1337/v1"
+    compatible_local_openai_model: str = "mistral-7b-instruct"
+    compatible_local_openai_api_key: str = ""
+    compatible_local_openai_reasoning: bool = False
 
     # Model assignments by task type
     model_assignments: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
@@ -51,6 +73,12 @@ class AppConfig:
         "voice_realtime": {"provider": "gemini", "model": "gemini-2.5-flash"},
         "fast_response": {"provider": "groq", "model": "llama-3.1-8b-instant"},
         "code_generation": {"provider": "openrouter", "model": "openai/gpt-4o"},
+        "image_generation": {"provider": "pollinations", "model": "flux"},
+        "music_generation": {"provider": "minimax", "model": "music-2.6"},
+        "local_ai": {"provider": "compatible_local_openai", "model": "mistral-7b-instruct"},
+        "minimax_llm": {"provider": "minimax", "model": "MiniMax-M2.7"},
+        "ollama_cloud": {"provider": "ollama_cloud", "model": "nemotron-3-super:cloud"},
+        "nvidia_nim": {"provider": "nvidia_nim", "model": "meta/llama-3.1-70b-instruct"},
     })
     
     # UI settings

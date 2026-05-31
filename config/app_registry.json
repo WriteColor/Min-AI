@@ -1,24 +1,4 @@
 {
-  "apps": {
-    "whatsapp": {
-      "type": "appid",
-      "id": "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"
-    },
-    "brave": {
-      "type": "exe",
-      "path": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
-    },
-    "calculator": {
-      "type": "appid",
-      "id": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
-    },
-    "minecraft launcher": {
-      "type": "appid",
-      "id": "Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
-    },
-    "minecraft": {
-      "type": "appid",
-      "id": "Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
+    "apps": {
     }
-  }
 }

@@ -19,7 +19,7 @@ El sistema actual presenta problemas fundamentales:
 - **Ejecución no verificable**: confirma acciones que nunca ocurrieron
 - **Dependencias rotas**: muchos módulos aparentan existir pero no funcionan correctamente
 
-**Scope total:** 16 áreas principales, divididas en 4 fases de implementación.
+**Scope total:** 17 áreas principales, divididas en 4 fases de implementación.
 
 ---
 
@@ -94,6 +94,7 @@ C:\React-Nextjs-Projects\Jarvis AI\
 | **Área 10** | Pipeline de Generación de Imágenes |
 | **Área 11** | Lógica de Ejecución de Acciones (Parser/Validator) |
 | **Área 12** | Sistema de Búsqueda Web Modular |
+| **Área 17** | Generación de Música con IA (MiniMax) |
 
 ### **FASE 4: Interfaz y polish** (Semanas 13-16)
 
@@ -2120,7 +2121,7 @@ Arquitectura preparada para widgets futuros:
 
 ### Versión 1.0 (2025-05-28)
 - Creación inicial del plan de implementación
-- Definición de 16 áreas de trabajo
+- Definición de 17 áreas de trabajo
 - Dividido en 4 fases de implementación
 - ~130 tareas identificadas
 
@@ -2178,6 +2179,80 @@ Cada área debe incluir:
 2. **Dependencias circulares**: algunas áreas dependen de otras que también están en desarrollo
 3. **Testing insuficiente**: presión de tiempo puede llevar a validar parcialmente
 
+
+## 📦 ÁREA 17: Generación de Música con IA (MiniMax)
+
+### 17.1 Descripción General
+
+Integración de generación de música vía MiniMax API. Permite crear canciones originales con lyrics personalizados, covers de canciones existentes, y generación de letras de canciones — todo dentro del ecosistema del asistente.
+
+### 17.2 Arquitectura
+
+```
+Jarvis AI/
+├── services/
+│   └── music_generator.py    (294 líneas)
+├── actions/
+│   └── music/
+│       ├── music_generation.py  (57 líneas)
+│       └── __init__.py
+└── core/
+    ├── tool_schemas.py      (1510 líneas)
+    ├── action_registry.py   (449 líneas)
+    └── config_manager.py   (257 líneas)
+```
+
+### 17.3 MiniMax API
+
+| Endpoint | Método | Modelo | Uso |
+|----------|--------|-------|-----|
+| `/v1/music_generation` | POST | music-2.6 | Generación text-to-music |
+| `/v1/music_cover` | POST | music-cover | Cover de canciones |
+| `/v1/music_cover_preprocess` | POST | — | Preproceso de cover |
+| `/v1/lyrics_generation` | POST | — | Generación de letras |
+
+### 17.4 Componentes Implementados
+
+#### 17.4.1 MusicGenerator (services/music_generator.py)
+- `generate(prompt, lyrics, model, is_instrumental)` — generación original
+- `generate_cover(audio_url, prompt)` — cover de canción existente
+- `preprocess_cover(audio_url)` — preproceso de audio
+- `generate_lyrics(prompt)` — generación de letras
+- `_download_audio(url, filename)` — descarga con retries
+- `get_recent(n=10)` / `get_stats()` — consulta de historial
+
+#### 17.4.2 Action Wrapper (actions/music/music_generation.py)
+- `music_generation(parameters, player)` — acción principal
+- `music_lyrics_generation(parameters, player)` — generación de letras
+
+#### 17.4.3 Configuración (core/config_manager.py)
+- `minimax_api_key` — API key de MiniMax
+- `minimax_music_model` — modelo por defecto (music-2.6)
+- `minimax_music_output_dir` — directorio de salida
+- `model_assignments.music_generation` — {provider: minimax, model: music-2.6}
+
+### 17.5 Metadata Logging
+
+Archivo: `logs/music_generation/generated_music.jsonl`
+
+```json
+{"timestamp": "2026-05-30T...", "type": "original", "model": "music-2.6", "prompt": "...", "lyrics": "...", "filename": "song_xxx.mp3", "duration": "...", "file_size": "..."}
+```
+
+### 17.6 Tareas Completadas
+
+- [x] 17.1.1 Implementar MusicGenerator service
+- [x] 17.1.2 Integrar MiniMax API (music-2.6, music-cover)
+- [x] 17.1.3 Implementar generación de lyrics
+- [x] 17.1.4 Agregar tool schema en tool_schemas.py
+- [x] 17.1.5 Crear action wrapper en actions/music/
+- [x] 17.1.6 Registrar en action_registry.py BUILTIN_ACTIONS
+- [x] 17.1.7 Agregar 'music' a CATEGORIES en action_dispatcher.py
+- [x] 17.1.8 Configurar minimax_api_key en AppConfig
+- [x] 17.1.9 Implementar metadata logging en JSONL
+- [x] 17.1.10 Verificación de sintaxis y imports
+
+
 ---
 
 ## 📅 CRONOGRAMA SUGERIDO
@@ -2195,7 +2270,7 @@ Cada área debe incluir:
 ### Fase 3: Semanas 9-12
 - **Semana 9**: Área 9 (Vision) + Área 12 (Web Search)
 - **Semana 10-11**: Área 10 (Image Generation) + Área 11 (Action Parser)
-- **Semana 12**: Testing e integración de Fase 2-3
+- **Semana 12**: Área 17 (Music Gen) + Testing e integración de Fase 2-3
 
 ### Fase 4: Semanas 13-16
 - **Semana 13**: Área 13 (Audio Pipeline)

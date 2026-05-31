@@ -51,7 +51,7 @@ def visual_click(parameters: dict, player=None) -> str:
             img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
             
             # Redimensionar para API manteniendo proporción y ahorrando tokens
-            max_size = (1280, 720)
+            max_size = (800, 600)
             img.thumbnail(max_size, Image.Resampling.BILINEAR)
             new_w, new_h = img.size
             
@@ -71,7 +71,7 @@ def visual_click(parameters: dict, player=None) -> str:
         )
 
         payload = {
-            "model": "google/gemini-2.5-flash",
+            "model": "google/gemini-2.5-flash:free",
             "max_tokens": 50,
             "messages": [
                 {

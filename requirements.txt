@@ -37,3 +37,10 @@ vosk
 tzdata
 openai>=1.0.0
 groq>=2.0.0
+pyaudio
+soundfile
+openpyxl
+python-docx
+scikit-learn
+pyyaml
+pywin32
