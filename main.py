@@ -386,11 +386,13 @@ class MINAssistant:
                 # ── Non-Gemini providers (OpenRouter, etc.) ──────────────
                 if provider != "gemini":
                     self._loop = asyncio.get_event_loop()
+                    self.tts._loop = self._loop
                     self.audio_in_queue = asyncio.Queue()
                     self.out_queue = asyncio.Queue(maxsize=5)
                     self._turn_done_event = asyncio.Event()
                     self._reconnect_event = asyncio.Event()
                     self.session = None
+                    self.tts.session = None
 
                     self.audio.assign_session(
                         self.session, self._loop, self.out_queue,
@@ -425,7 +427,9 @@ class MINAssistant:
                     asyncio.TaskGroup() as tg
                 ):
                     self.session = session
+                    self.tts.session = session
                     self._loop = asyncio.get_event_loop()
+                    self.tts._loop = self._loop
                     self.audio_in_queue = asyncio.Queue()
                     self.out_queue = asyncio.Queue(maxsize=5)
                     self._turn_done_event = asyncio.Event()
@@ -462,6 +466,8 @@ class MINAssistant:
                 consecutive_fails += 1
 
             # Exponential backoff for reconnection
+            self.session = None
+            self.tts.session = None
             self.tts.set_speaking(False)
             self.ui.set_state("THINKING")
 

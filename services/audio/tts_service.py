@@ -410,6 +410,29 @@ class TTSService:
             return
         print(f"[MIN] speak command: {clean[:100]}")
 
+        from core.config_manager import get_config
+        cfg = get_config()
+
+        # If Gemini Live is active and we have an active session, send text back to Gemini to speak natively.
+        if cfg.active_provider == "gemini" and getattr(self, "session", None) is not None:
+            if self._loop is None:
+                try:
+                    self._loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    pass
+            if self._loop:
+                print(f"[MIN] Gemini Live redirecting tool speech to WebSocket: {clean[:100]}")
+                asyncio.run_coroutine_threadsafe(
+                    self.session.send_client_content(
+                        turns={"parts": [{"text": clean}]},
+                        turn_complete=True
+                    ),
+                    self._loop
+                )
+            else:
+                print("[MIN] Gemini Live redirect skipped: no running loop")
+            return
+
         if self._is_speaking:
             print(f"[MIN] TTS: skipped (already speaking)")
             return
