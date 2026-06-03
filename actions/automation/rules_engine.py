@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = BASE_DIR / "config" / "rules.json"
 
 def rules_engine(parameters: dict, player=None) -> str:

@@ -21,7 +21,7 @@ PROTECTED_FILES = [
     r"core[/\\]prompt\.txt",
     r"actions[/\\]terminal_agent\.py",
     r"actions[/\\]self_edit\.py",
-    r"config[/\\]api_keys\.json",
+    r"config[/\\]config\.json",
 ]
 
 def _is_protected(file_path: str) -> bool:

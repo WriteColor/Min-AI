@@ -10,7 +10,6 @@ from .base import (
     ModelInfo,
     ProviderCapability,
     MultimodalProvider,
-    LocalProvider,
     UnifiedProvider,
     register_provider,
     get_provider_class,
@@ -49,7 +48,6 @@ __all__ = [
     "ModelInfo",
     "ProviderCapability",
     "MultimodalProvider",
-    "LocalProvider",
     "UnifiedProvider",
 
     # Registry

@@ -8,8 +8,8 @@ except ImportError:
 
 
 class VAD:
-    def __init__(self, sample_rate: int = 16000, rms_threshold: float = 0.003,
-                 webrtc_mode: int = 1):
+    def __init__(self, sample_rate: int = 16000, rms_threshold: float = 0.0005,
+                 webrtc_mode: int = 2):
         self.sample_rate = sample_rate
         self.rms_threshold = rms_threshold
         self._webrtc = None
@@ -26,7 +26,10 @@ class VAD:
             return False, rms
         if self._webrtc is not None and self.sample_rate in (8000, 16000, 32000, 48000):
             try:
-                audio_bytes = (indata.astype(np.float32) * 32768).astype(np.int16).tobytes()
+                if np.issubdtype(indata.dtype, np.integer):
+                    audio_bytes = indata.astype(np.int16).tobytes()
+                else:
+                    audio_bytes = (indata * 32768.0).astype(np.int16).tobytes()
                 return self._webrtc.is_speech(audio_bytes, self.sample_rate), rms
             except Exception:
                 pass
@@ -34,6 +37,9 @@ class VAD:
 
     def _calc_rms(self, indata: np.ndarray) -> float:
         try:
-            return float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
+            if np.issubdtype(indata.dtype, np.integer):
+                return float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
+            else:
+                return float(np.sqrt(np.mean(indata.astype(np.float32) ** 2)))
         except Exception:
             return 0.0

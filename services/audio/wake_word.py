@@ -19,6 +19,12 @@ class WakeWordDetector:
         if not os.path.exists(model_path):
             return
         try:
+            from core.config_manager import get_config
+            if get_config().active_provider == "gemini":
+                return
+        except Exception:
+            pass
+        try:
             import vosk
             self._model = vosk.Model(model_path)
             self._recognizer = vosk.KaldiRecognizer(self._model, self.sample_rate)

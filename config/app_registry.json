@@ -1,4 +1,8 @@
 {
     "apps": {
+        "brave": {
+            "type": "exe",
+            "path": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
+        }
     }
 }

@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 from datetime import datetime
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 GOALS_PATH = BASE_DIR / "config" / "goals.json"
 
 def load_goals() -> list:

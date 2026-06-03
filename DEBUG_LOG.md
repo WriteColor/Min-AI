@@ -174,6 +174,69 @@
 
 ---
 
+---
+
+## Sesión: 2026-05-31 - Sistema de Archivos Externos y Config Loading
+
+### Cambios Implementados
+
+#### 1. API Routes de Archivos Externos
+
+| Archivo | Descripción |
+|---------|-------------|
+| `Min-UI/lib/file-access.ts` | Validación de rutas, ALLOWED_BASE_DIRS, sanitización |
+| `Min-UI/app/api/files/route.ts` | GET/POST/DELETE con validación de path traversal |
+
+**ALLOWED_BASE_DIRS:**
+```typescript
+config:    "C:/React-Nextjs-Projects/Jarvis AI/config"
+jarvis:    "C:/React-Nextjs-Projects/Jarvis AI"
+documents: "C:/Users/Jerem/Documents"
+downloads: "C:/Users/Jerem/Downloads"
+```
+
+#### 2. Config Loader con 3 Capas de Fallback
+
+```typescript
+// Lectura:
+// 1. Tauri → invoke("read_config_file")
+// 2. Web → /api/config GET → Node.js fs
+// 3. Fallback → /config/*.json (public/)
+
+// Escritura:
+// 1. Tauri → invoke("save_config_json")
+// 2. Web → /api/files POST → Node.js fs
+// 3. Fallback → ws.saveConfig() → WebSocket → Python
+```
+
+#### 3. Rust Commands (main.rs)
+- `write_config_file` - Escritura de archivos individuales
+- `save_config_json` - Guardado directo de JSON
+- Todos registrados en `.invoke_handler()`
+
+#### 4. Tauri Detection Fix
+- `window.__TAURI_INTERNALS__` → `window.__TAURI__`
+- Archivos: `page.tsx`, `SettingsDialog.tsx`
+
+#### 5. UI Widgets Actualizados
+- **TodoWidget**: Layout apilado (input row, priority + add button row), emojis 🔴🟡⚪
+- **MusicWidget**: 12-bar sine-wave visualizer, gradiente púrpura, glow on play
+- **ControlBar**: `<input type="file">` en vez de text input manual
+- **Chat**: Multi-file upload con `ws.setFile()`
+- **SettingsDialog**: Camera enumeration con `enumerateDevices()`, dropdowns reales
+
+### TypeScript Compilation
+```
+pnpm exec tsc --noEmit → PASS (sin errores)
+```
+
+### Documentación Actualizada
+- `Min-UI/README.md` - Reescrito completamente
+- `ARCHITECTURE.md` - Sección Min-UI actualizada
+- `CONFIGURATION.md` - API routes y flujo de fallback documentados
+
+---
+
 *Log generado automáticamente - MIN AI Debug Session*
 
 ---

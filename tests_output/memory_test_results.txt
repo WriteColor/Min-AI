@@ -1,6 +1,0 @@
-Memory Test Results
-==================
-Passed: 16/18
-Failed: 2
-
-Memory file location: C:\React-Nextjs-Projects\Jarvis AI\memory\long_term.json

@@ -9,7 +9,8 @@ from mss import mss
 from PIL import Image
 import io
 
-API_FILE = Path("config/config.json")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+API_FILE = BASE_DIR / "config" / "config.json"
 
 def _load_config() -> dict:
     """Loads configuration from config/config.json."""
@@ -63,7 +64,7 @@ def screen_vision(parameters: dict, player=None) -> str:
     action = parameters.get("action", "describe").lower().strip()
     
     # Ruta local de guardado de pantalla
-    img_path = Path("config/last_captured_screen.png")
+    img_path = BASE_DIR / "config" / "last_captured_screen.png"
     
     if player:
         player.write_log(f"👁️ Capturando pantalla en segundo plano para análisis ({provider.upper()})...")

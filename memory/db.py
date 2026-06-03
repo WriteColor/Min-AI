@@ -315,18 +315,13 @@ class MemoryDatabase:
                 LIMIT ?
             """, (max_entries,))
             
-            if not cursor.fetchone():
+            rows = cursor.fetchall()
+            if not rows:
                 return ""
-            
-            cursor.execute("""
-                SELECT category, key, value FROM semantic_memory
-                ORDER BY relevance_score DESC, access_count DESC
-                LIMIT ?
-            """, (max_entries,))
             
             lines = ["[USER MEMORY]"]
             current_cat = None
-            for row in cursor.fetchall():
+            for row in rows:
                 if row["category"] != current_cat:
                     lines.append(f"\n## {row['category'].upper()}")
                     current_cat = row["category"]
@@ -456,18 +451,11 @@ class MemoryDatabase:
                 ORDER BY timestamp DESC
                 LIMIT ?
             """, (session_id, max_interactions))
-            
-            if not cursor.fetchone():
+
+            rows = cursor.fetchall()
+            if not rows:
                 return ""
-            
-            cursor.execute("""
-                SELECT timestamp, type, content 
-                FROM episodic_interactions
-                WHERE session_id = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (session_id, max_interactions))
-            
+
             lines = []
             type_labels = {
                 "user_text": "Usuario",
@@ -479,7 +467,7 @@ class MemoryDatabase:
                 "system": "Sistema"
             }
             
-            for row in cursor.fetchall():
+            for row in rows:
                 label = type_labels.get(row["type"], "?")
                 ts = datetime.fromisoformat(row["timestamp"]).strftime("%H:%M:%S")
                 lines.append(f"[{ts}] {label}: {row['content'][:300]}")

@@ -23,9 +23,20 @@ CONFIG_DIR = BASE_DIR / "config"
 @dataclass
 class AppConfig:
     """Main application configuration."""
-    # API Keys & Credentials
+    # API Keys & Credentials (all AI providers)
     gemini_api_key: str = ""
+    openai_api_key: str = ""
+    groq_api_key: str = ""
     openrouter_api_key: str = ""
+    opencode_api_key: str = ""
+    opencode_model: str = "opencodeofficial/qwen2.5-72b-instruct"
+    minimax_api_key: str = ""
+    pollinations_api_key: str = ""
+    nvidia_nim_api_key: str = ""
+    ollama_cloud_api_key: str = ""
+    compatible_local_openai_api_key: str = ""
+
+    # OAuth
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = "http://127.0.0.1:8888/callback"
@@ -38,41 +49,36 @@ class AppConfig:
     vision_model: str = ""
     openrouter_default_model: str = "google/gemini-2.5-flash:free"
     
-    # Pollinations.ai settings
-    pollinations_api_key: str = ""
+    # Pollinations.ai settings (image generation)
     pollinations_default_model: str = "flux"
     pollinations_image_width: int = 1024
     pollinations_image_height: int = 1024
 
-    # MiniMax API settings
-    minimax_api_key: str = ""
+    # MiniMax music generation settings
     minimax_music_model: str = "music-2.6"
     minimax_music_output_dir: str = "~/Music/MIN Generated Music"
     minimax_llm_model: str = "MiniMax-M2.7"
 
     # Ollama Cloud settings (cloud.ollama.com - hosted models)
-    ollama_cloud_api_key: str = ""
     ollama_cloud_base_url: str = "https://cloud.ollama.com/v1"
     ollama_cloud_model: str = "nemotron-3-super:cloud"
 
     # NVIDIA NIM settings (integrate.api.nvidia.com - AI Foundation Models)
-    nvidia_nim_api_key: str = ""
     nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_nim_model: str = "meta/llama-3.1-70b-instruct"
 
     # Compatible Local LLM settings (OpenAI-compatible local endpoints like Ollama, LM Studio, Jan AI, etc.)
     compatible_local_openai_base_url: str = "http://127.0.0.1:1337/v1"
     compatible_local_openai_model: str = "mistral-7b-instruct"
-    compatible_local_openai_api_key: str = ""
     compatible_local_openai_reasoning: bool = False
 
     # Model assignments by task type
     model_assignments: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
-        "general_reasoning": {"provider": "gemini", "model": "gemini-2.5-pro"},
+        "general_reasoning": {"provider": "gemini", "model": "gemini-2.5-flash"},
         "vision": {"provider": "gemini", "model": "gemini-2.5-flash"},
         "voice_realtime": {"provider": "gemini", "model": "gemini-2.5-flash"},
         "fast_response": {"provider": "groq", "model": "llama-3.1-8b-instant"},
-        "code_generation": {"provider": "openrouter", "model": "openai/gpt-4o"},
+        "code_generation": {"provider": "openrouter", "model": "google/gemini-2.5-flash:free"},
         "image_generation": {"provider": "pollinations", "model": "flux"},
         "music_generation": {"provider": "minimax", "model": "music-2.6"},
         "local_ai": {"provider": "compatible_local_openai", "model": "mistral-7b-instruct"},
@@ -89,8 +95,10 @@ class AppConfig:
     voice_enabled: bool = True
     speech_rate: float = 1.0
     min_voice: str = "Aoede"
+    voice_preference: str = "AUDIO"  # AUDIO or TEXT — controls Gemini Live response modality
     mic_device: int = 0
     speaker_device: str = ""
+    mic_sensitivity: float = 0.003
     
     # Camera settings
     camera_enabled: bool = True
@@ -274,14 +282,19 @@ class ConfigManager:
 
 
 # Global config instance
+import threading
+
 _config_instance = None
+_config_lock = threading.Lock()
 
 
 def get_config_manager() -> ConfigManager:
     """Get global configuration manager."""
     global _config_instance
     if _config_instance is None:
-        _config_instance = ConfigManager()
+        with _config_lock:
+            if _config_instance is None:
+                _config_instance = ConfigManager()
     return _config_instance
 
 

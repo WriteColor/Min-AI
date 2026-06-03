@@ -9,8 +9,7 @@ import asyncio
 from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from .base import (
-    BaseProvider, ProviderConfig, ModelInfo, ProviderCapability,
-    LocalProvider, register_provider
+    BaseProvider, ProviderConfig, ModelInfo, ProviderCapability, register_provider
 )
 
 
@@ -48,7 +47,7 @@ LOCAL_MODELS = {
 }
 
 
-class LocalProvider(LocalProvider):
+class LocalProvider(BaseProvider):
     """
     Provider for local AI inference servers (Ollama, LM Studio, etc.).
     
@@ -85,8 +84,11 @@ class LocalProvider(LocalProvider):
                 base_url=self._base_url
             )
             
-            models = await asyncio.to_thread(self._client.models.list)
-            if models.data:
+            models = await self._client.models.list()
+            models_list = []
+            async for m in models:
+                models_list.append(m)
+            if models_list:
                 self._is_connected = True
                 return True
             

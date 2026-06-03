@@ -252,9 +252,15 @@ class ProviderManager:
                 print(f"[ProviderManager] Event callback error: {e}")
 
 
+_provider_manager_instance = None
+
+
 def get_provider_manager() -> ProviderManager:
-    """Get the global provider manager instance."""
-    return ProviderManager()
+    """Get the global provider manager instance (singleton)."""
+    global _provider_manager_instance
+    if _provider_manager_instance is None:
+        _provider_manager_instance = ProviderManager()
+    return _provider_manager_instance
 
 
 def get_registry() -> ProviderRegistry:

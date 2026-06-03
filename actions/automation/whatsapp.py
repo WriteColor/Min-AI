@@ -12,7 +12,7 @@ try:
 except ImportError:
     pyautogui = None
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CONTACTS_FILE = BASE_DIR / "config" / "whatsapp_contacts.json"
 
 def load_contacts() -> dict:

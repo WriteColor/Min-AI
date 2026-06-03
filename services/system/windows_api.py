@@ -47,29 +47,39 @@ except ImportError:
 
 import ctypes
 from ctypes import cast, POINTER, c_void_p, c_int, c_float, c_ulong, byref
+from comtypes import GUID, Interface
 
-CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
-IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
-IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
-IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
-IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
-IID_IAudioSessionEnumerator = ctypes.UUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}')
-IID_IPropertyStore = ctypes.UUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}')
+# Store GUIDs as 16-byte binary buffers (not comtypes wrappers) so that
+# ctypes.byref() produces a pointer that Windows APIs can read correctly.
+# comtypes.GUID objects have a .bytes attribute with the raw binary representation.
+_CLSID_MMDeviceEnumerator = GUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}').bytes
+_IID_IMMDeviceEnumerator  = GUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}').bytes
+_IID_IMMDevice            = GUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}').bytes
+_IID_IAudioSessionManager2 = GUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}').bytes
+_IID_IAudioSessionControl  = GUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}').bytes
+_IID_IAudioSessionEnumerator = GUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}').bytes
+_IID_IPropertyStore        = GUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}').bytes
 
-class IMMDeviceEnumerator(ctypes.Interface):
-    _iid_ = IID_IMMDeviceEnumerator
 
-class IMMDevice(ctypes.Interface):
-    _iid_ = IID_IMMDevice
+class IMMDeviceEnumerator(Interface):
+    _iid_ = _IID_IMMDeviceEnumerator
 
-class IAudioSessionManager2(ctypes.Interface):
-    _iid_ = IID_IAudioSessionManager2
 
-class IAudioSessionControl(ctypes.Interface):
-    _iid_ = IID_IAudioSessionControl
+class IMMDevice(Interface):
+    _iid_ = _IID_IMMDevice
 
-class IAudioSessionEnumerator(ctypes.Interface):
-    _iid_ = IID_IAudioSessionEnumerator
+
+class IAudioSessionManager2(Interface):
+    _iid_ = _IID_IAudioSessionManager2
+
+
+class IAudioSessionControl(Interface):
+    _iid_ = _IID_IAudioSessionControl
+
+
+class IAudioSessionEnumerator(Interface):
+    _iid_ = _IID_IAudioSessionEnumerator
+
 
 
 class WindowState(Enum):
@@ -814,18 +824,9 @@ class WindowsService:
             ole32.CoInitialize(None)
             
             try:
-                # IMMDeviceEnumerator CLSID
-                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
-                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
-                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
-                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
-                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
-                IID_IAudioSessionEnumerator = ctypes.UUID('{E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}')
-                IID_IPropertyStore = ctypes.UUID('{886D8EEB-8CF2-4446-8D02-CDFBA7454A4D}')
-                
                 # Create device enumerator
                 enumerator = ctypes.cast(
-                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ole32.CoCreateInstance(ctypes.byref(ctypes.create_string_buffer(_CLSID_MMDeviceEnumerator)), None, ctypes.c_int(1)),
                     ctypes.POINTER(IMMDeviceEnumerator)
                 )
                 
@@ -837,7 +838,7 @@ class WindowsService:
                 
                 # Activate session manager
                 session_mgr = IAudioSessionManager2()
-                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                device.Activate(ctypes.byref(ctypes.create_string_buffer(_IID_IAudioSessionManager2)), 0x00000003, None, ctypes.byref(session_mgr))
                 
                 # Get session enumerator
                 session_enum = ctypes.c_void_p()
@@ -927,14 +928,8 @@ class WindowsService:
             ole32.CoInitialize(None)
             
             try:
-                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
-                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
-                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
-                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
-                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
-                
                 enumerator = ctypes.cast(
-                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ole32.CoCreateInstance(ctypes.byref(ctypes.create_string_buffer(_CLSID_MMDeviceEnumerator)), None, ctypes.c_int(1)),
                     ctypes.POINTER(IMMDeviceEnumerator)
                 )
                 
@@ -944,7 +939,7 @@ class WindowsService:
                     return False
                 
                 session_mgr = IAudioSessionManager2()
-                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                device.Activate(ctypes.byref(ctypes.create_string_buffer(_IID_IAudioSessionManager2)), 0x00000003, None, ctypes.byref(session_mgr))
                 
                 session_enum = ctypes.c_void_p()
                 session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))
@@ -1020,14 +1015,8 @@ class WindowsService:
             ole32.CoInitialize(None)
             
             try:
-                CLSID_MMDeviceEnumerator = ctypes.UUID('{BCDE0395-E836-4931-9B26-3D3B1C8E8DB6}')
-                IID_IMMDeviceEnumerator = ctypes.UUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
-                IID_IMMDevice = ctypes.UUID('{D666063F-1587-426B-84F8-7A8D1B6F6D7D}')
-                IID_IAudioSessionManager2 = ctypes.UUID('{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}')
-                IID_IAudioSessionControl = ctypes.UUID('{F4B1A599-7266-4319-AFE5-4B4B3E89CF2F}')
-                
                 enumerator = ctypes.cast(
-                    ole32.CoCreateInstance(ctypes.byref(CLSID_MMDeviceEnumerator), None, ctypes.c_int(1)),
+                    ole32.CoCreateInstance(ctypes.byref(ctypes.create_string_buffer(_CLSID_MMDeviceEnumerator)), None, ctypes.c_int(1)),
                     ctypes.POINTER(IMMDeviceEnumerator)
                 )
                 
@@ -1035,7 +1024,7 @@ class WindowsService:
                 enumerator.GetDefaultAudioEndpoint(0, 1, ctypes.byref(device))
                 
                 session_mgr = IAudioSessionManager2()
-                device.Activate(ctypes.byref(IID_IAudioSessionManager2), 0x00000003, None, ctypes.byref(session_mgr))
+                device.Activate(ctypes.byref(ctypes.create_string_buffer(_IID_IAudioSessionManager2)), 0x00000003, None, ctypes.byref(session_mgr))
                 
                 session_enum = ctypes.c_void_p()
                 session_mgr.GetSessionEnumerator(ctypes.byref(session_enum))

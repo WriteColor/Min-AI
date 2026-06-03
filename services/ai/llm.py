@@ -104,8 +104,8 @@ class LLMConsumer:
                 api_key = cfg.openrouter_api_key
                 model = cfg.openrouter_default_model or "google/gemini-2.5-flash:free"
             elif provider_name == "opencode":
-                api_key = cfg.openrouter_api_key
-                model = "meta-llama/llama-3.1-405b-instruct"
+                api_key = cfg.opencode_api_key if hasattr(cfg, "opencode_api_key") else ""
+                model = cfg.opencode_model or "opencodeofficial/qwen2.5-72b-instruct"
             elif provider_name == "minimax":
                 api_key = cfg.minimax_api_key
                 model = cfg.minimax_llm_model or "MiniMax-M2.7"
@@ -136,21 +136,36 @@ class LLMConsumer:
                 self.ui.clear_min_response()
 
                 full_resp = ""
+                if provider_name != "gemini":
+                    self.tts_service.start_stream()
+
                 async for chunk in provider_inst.stream_text(full_prompt):
                     if chunk:
                         full_resp += chunk
                         self.ui.stream_min_chunk(chunk)
+                        if provider_name != "gemini":
+                            self.tts_service.feed_token(chunk)
+
+                if provider_name != "gemini":
+                    self.tts_service.end_stream()
+
+                from services._core.helpers import clean_think_blocks
+                cleaned_resp = clean_think_blocks(full_resp)
 
                 # Log episodic interaction in database if available
                 try:
                     from memory.service import MemoryService
                     MemoryService().log_user_message(text)
-                    MemoryService().log_min_response(full_resp)
+                    MemoryService().log_min_response(cleaned_resp)
                 except Exception:
                     pass
 
-                # Speak response
-                await self.tts_service.speak_local(full_resp)
+                # Wait for playback to finish before returning state to LISTENING
+                if provider_name != "gemini" and self.tts_service._playback_task:
+                    try:
+                        await self.tts_service._playback_task
+                    except Exception:
+                        pass
 
             except Exception as e:
                 self.ui.clear_min_response()

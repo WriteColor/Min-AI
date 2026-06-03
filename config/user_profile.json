@@ -1,0 +1,22 @@
+{
+  "name": "Jere",
+  "habits": {
+    "morning_brief": 2,
+    "windows_settings": 1,
+    "weather_report": 2,
+    "image_generation": 3,
+    "terminal_agent": 1,
+    "goals": 1,
+    "file_controller": 4,
+    "computer_settings": 3,
+    "reminder": 1,
+    "screen_vision": 7,
+    "accessibility": 1,
+    "min_ui_control": 6,
+    "browser_control": 9,
+    "open_app": 3,
+    "computer_control": 5,
+    "web_search": 2,
+    "system_monitor": 1
+  }
+}

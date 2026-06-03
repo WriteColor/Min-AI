@@ -162,8 +162,8 @@ def main():
         venv_python = sys.executable  # Fallback
 
     try:
-        subprocess.run([venv_python, "-m", "pip", "install", "--upgrade", "pip"], check=True)
-        subprocess.run([venv_python, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+        subprocess.run([venv_python, "-m", "pip", "install", "--upgrade", "pip", "--no-cache-dir"], check=True)
+        subprocess.run([venv_python, "-m", "pip", "install", "-r", "requirements.txt", "--no-cache-dir"], check=True)
         print(f"{GREEN}\n[OK] Todas las dependencias se instalaron correctamente.{RESET}")
     except Exception as e:
         print(f"{RED}\n[ERROR] Ocurrió un error al instalar dependencias: {e}{RESET}")

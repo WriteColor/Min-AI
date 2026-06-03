@@ -167,13 +167,21 @@ class MINAssistant:
 
         print("[MIN] Assistant initialized successfully")
 
-    def _init_vosk(self):
+    def _init_vosk(self, force=False):
         """Initialize Vosk wake-word recognizer if model exists."""
+        if _get_llm_provider() == "gemini" and not force:
+            print("[MIN] Gemini provider active at startup, skipping Vosk initialization")
+            return None
         try:
+            import os
             import vosk
+            from services.audio.stt import _MODEL_CACHE
             model_path = BASE_DIR / "config" / "vosk_model"
             if model_path.exists():
-                model = vosk.Model(str(model_path))
+                abs_path = os.path.abspath(str(model_path))
+                if abs_path not in _MODEL_CACHE:
+                    _MODEL_CACHE[abs_path] = vosk.Model(str(model_path))
+                model = _MODEL_CACHE[abs_path]
                 recognizer = vosk.KaldiRecognizer(model, 16000)
                 print("[MIN] Vosk wake-word model loaded")
                 return recognizer
@@ -207,6 +215,28 @@ class MINAssistant:
     def _on_text_command(self, text: str):
         """Route text commands from UI to appropriate handler."""
         if not self._loop:
+            return
+
+        if getattr(self.audio, "is_sleeping", False):
+            wake_keywords = ["despierta", "despiértate", "despiertate", "wake", "wake up", "min", "jarvis"]
+            if any(kw in text.lower() for kw in wake_keywords):
+                self.is_sleeping = False
+                self.audio.is_sleeping = False
+                if _get_llm_provider() == "gemini":
+                    self.vosk_recognizer = None
+                    self.audio.vosk_recognizer = None
+                    from services.audio.stt import _MODEL_CACHE
+                    _MODEL_CACHE.clear()
+                    import gc
+                    gc.collect()
+                    print("[MIN] Vosk model unloaded and memory freed after text wake-word detection")
+                self.ui.set_state("LISTENING")
+                self.ui.write_log("SYS: 🟠 ¡Despierto!")
+                try:
+                    import winsound
+                    winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                except Exception:
+                    pass
             return
 
         # Handle audio file input
@@ -257,11 +287,14 @@ class MINAssistant:
             except Exception:
                 pass
             self.running = False
-            sys.exit(0)
             return {"result": "Apagando MIN. Hasta luego!"}
 
         if name == "sleep_mode":
             self.is_sleeping = True
+            self.audio.is_sleeping = True
+            if _get_llm_provider() == "gemini":
+                self.vosk_recognizer = self._init_vosk(force=True)
+                self.audio.vosk_recognizer = self.vosk_recognizer
             self.ui.write_log("SYS: Modo suspension activado")
             self.ui.set_state("MUTED")
             return {"result": "Entrando en suspension. Di 'MIN' para despertar."}
@@ -328,6 +361,27 @@ class MINAssistant:
         while self.running:
             try:
                 provider = _get_llm_provider()
+
+                # Enforce dynamic resource routing: load Vosk/Kokoro on non-Gemini, unload completely on Gemini
+                if provider == "gemini":
+                    if self.vosk_recognizer is not None:
+                        print("[MIN] Gemini provider active, unloading Vosk wake-word recognizer...")
+                        self.vosk_recognizer = None
+                        self.audio.vosk_recognizer = None
+                    if hasattr(self.audio, "audio_pipeline"):
+                        print("[MIN] Gemini provider active, destroying AudioPipeline local engines...")
+                        delattr(self.audio, "audio_pipeline")
+                    from services.audio.tts import KokoroEngine
+                    KokoroEngine().unload()
+                    from services.audio.stt import _MODEL_CACHE
+                    _MODEL_CACHE.clear()
+                    import gc
+                    gc.collect()
+                else:
+                    if self.vosk_recognizer is None:
+                        print("[MIN] Non-Gemini provider active, initializing Vosk wake-word recognizer...")
+                        self.vosk_recognizer = self._init_vosk()
+                        self.audio.vosk_recognizer = self.vosk_recognizer
 
                 # ── Non-Gemini providers (OpenRouter, etc.) ──────────────
                 if provider != "gemini":

@@ -10,7 +10,7 @@ from actions.automation.weather_report import fetch_weather_data
 from actions.automation.goals import load_goals
 import psutil
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 STATE_FILE = BASE_DIR / "config" / "morning_brief_state.json"
 
 def _today_str() -> str:

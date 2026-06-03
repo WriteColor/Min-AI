@@ -188,16 +188,42 @@ C:\React-Nextjs-Projects\Jarvis AI\
 │   ├── screen_observer/
 │   └── music_generation/
 │
-├── Min-UI/                   # Frontend (React/TypeScript)
-│   ├── src/
-│   │   ├── app/            # Next.js app
-│   │   ├── components/      # UI components
-│   │   │   ├── SettingsDialog.tsx
-│   │   │   ├── ControlBar.tsx
-│   │   │   ├── Orb.tsx
-│   │   │   └── widgets/
-│   │   ├── hooks/          # Custom hooks
-│   │   └── types/          # TypeScript types
+├── Min-UI/                   # Frontend (Next.js 14 + Tauri 2.x)
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── config/route.ts   # Config API (GET/POST)
+│   │   │   └── files/route.ts    # Secure file access API
+│   │   ├── page.tsx
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── SettingsDialog.tsx
+│   │   ├── ControlBar.tsx
+│   │   ├── Chat.tsx
+│   │   ├── SidebarDock.tsx
+│   │   ├── Orb.tsx
+│   │   ├── StatusDot.tsx
+│   │   ├── ui/               # shadcn-style components
+│   │   └── widgets/
+│   │       ├── WeatherWidget.tsx
+│   │       ├── MusicWidget.tsx
+│   │       ├── ClockWidget.tsx
+│   │       ├── TodoWidget.tsx
+│   │       └── FavoritesWidget.tsx
+│   ├── hooks/
+│   │   ├── useWebSocket.ts
+│   │   ├── use-mobile.ts
+│   │   └── use-toast.ts
+│   ├── lib/
+│   │   ├── config-loader.ts  # 3-layer config fallback
+│   │   └── file-access.ts    # Path validation
+│   ├── types/
+│   │   └── index.ts          # TypeScript interfaces
+│   ├── src-tauri/           # Tauri 2.x Rust backend
+│   │   ├── src/main.rs      # Rust commands
+│   │   ├── Cargo.toml
+│   │   └── tauri.conf.json
+│   ├── public/
+│   │   └── config/           # Fallback config files
 │   └── package.json
 │
 ├── tests/                     # Test suite
@@ -384,17 +410,88 @@ All configuration via `config/config.json`:
 ## Frontend (Min-UI)
 
 Built with:
-- **Next.js** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
+- **Next.js 14** - React framework (App Router)
+- **TypeScript** - Type safety (no `any` types)
+- **Tailwind CSS v4** - Styling
 - **Radix UI** - Accessible primitives
 - **Three.js** - 3D Orb animation
+- **Tauri 2.x** - Desktop integration (Rust backend)
 
-Key components:
-- `SettingsDialog.tsx` - 6-provider model selector, API key configuration
-- `ControlBar.tsx` - Minimal auto-hide control bar
-- `Orb.tsx` - 3D reactive orb (listening/speaking states)
-- Widgets: Weather, Clock, Music, Tasks, Favorites
+### Min-UI Architecture
+
+```
+Min-UI/
+├── app/
+│   ├── api/
+│   │   ├── config/route.ts    # GET/POST config files (Node.js fs)
+│   │   └── files/route.ts    # GET/POST/DELETE external files
+│   ├── page.tsx               # Main component
+│   └── layout.tsx
+├── components/
+│   ├── SettingsDialog.tsx     # 6 tabs, Tauri/web hybrid loading
+│   ├── ControlBar.tsx         # File picker (replaced path input)
+│   ├── Chat.tsx               # Multi-file upload support
+│   ├── Orb.tsx                # 3D reactive orb
+│   ├── SidebarDock.tsx       # Widget dock
+│   └── widgets/
+│       ├── MusicWidget.tsx    # 12-bar spectrum visualizer
+│       ├── TodoWidget.tsx     # Stacked layout
+│       └── ...
+├── hooks/
+│   ├── useWebSocket.ts        # Complete WS communication hook
+│   ├── use-mobile.ts          # Viewport detection
+│   └── use-toast.ts          # Toast notification system
+├── lib/
+│   ├── config-loader.ts       # 3-layer fallback config loading
+│   ├── file-access.ts         # Path validation & sanitization
+│   └── utils.ts              # cn() utility
+└── src-tauri/
+    └── src/main.rs            # Rust commands (7 total)
+```
+
+### Min-UI Config Loading (3-Layer Fallback)
+
+```
+Load configs:
+  ├─ Tauri → invoke("read_config_file") → Rust fs
+  └─ Web
+       ├─ /api/config GET → Node.js fs
+       └─ Fallback: /config/*.json (public/)
+
+Save configs:
+  ├─ Tauri → invoke("save_config_json") → Rust fs
+  └─ Web
+       ├─ /api/files POST → Node.js fs
+       └─ Fallback: ws.saveConfig() → Python backend
+```
+
+### Tauri Rust Commands
+
+| Command | Description |
+|---------|-------------|
+| `start_agent` | Start Python agent process |
+| `stop_agent` | Stop agent |
+| `get_agent_status` | Get agent status |
+| `read_config_file` | Read single config file |
+| `write_config_file` | Write single config file |
+| `save_config_json` | Save JSON content directly |
+| `get_config_dir` | Get config directory path |
+| `list_config_files` | List files in config/ |
+
+### API Routes (Next.js)
+
+| Route | Methods | Description |
+|-------|---------|-------------|
+| `/api/config` | GET, POST | Read all / write single config file |
+| `/api/files` | GET, POST, DELETE | Secure external file access with path validation |
+
+### Key Components
+
+- `SettingsDialog.tsx` - 6 tabs, camera device enumeration, real device dropdowns
+- `ControlBar.tsx` - `<input type="file">` file picker (replaced manual path input)
+- `Chat.tsx` - Multi-file upload with `ws.setFile()` integration
+- `MusicWidget.tsx` - 12-bar sine-wave spectrum, purple gradient, glow on play
+- `TodoWidget.tsx` - Stacked layout: input row, priority dropdown + add button row
 
 ---
 

@@ -49,7 +49,9 @@ COMPATIBLE_COMBINATIONS: Dict[str, Dict[str, List[str]]] = {
             "openai/gpt-4o",
             "openai/gpt-4o-mini",
             "anthropic/claude-3.5-sonnet",
-            "google/gemini-2.5-flash"
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-flash:free",
+            "meta-llama/llama-3-8b-instruct:free"
         ],
         "vision": [
             "openai/gpt-4o",

@@ -1,6 +1,5 @@
 sounddevice
 google-genai
-google-generativeai
 pillow
 requests
 beautifulsoup4
@@ -35,8 +34,8 @@ cryptography
 eventlet
 vosk
 tzdata
-openai>=1.0.0
-groq>=2.0.0
+openai
+groq
 pyaudio
 soundfile
 openpyxl

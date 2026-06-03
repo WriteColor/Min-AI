@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 def _run_git_cmd(args: list[str]) -> tuple[int, str]:
     """Ejecuta un comando Git en el directorio base del proyecto y devuelve el código y la salida."""

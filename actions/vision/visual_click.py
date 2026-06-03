@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 # Utilizamos el API key de OpenRouter como está centralizado
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 API_FILE = BASE_DIR / "config" / "config.json"
 
 def _get_api_key() -> str:

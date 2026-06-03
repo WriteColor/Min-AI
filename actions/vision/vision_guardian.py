@@ -15,7 +15,7 @@ from mss import mss
 from PIL import Image
 import io
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CONFIG_DIR = BASE_DIR / "config"
 STATE_FILE = CONFIG_DIR / "vision_guardian_state.json"
 API_FILE = CONFIG_DIR / "config.json"
@@ -312,3 +312,8 @@ def vision_guardian(parameters: dict, player=None) -> str:
         status_str = "Activo" if state.get("enabled", False) else "Inactivo"
         interval = state.get("interval", 45)
         return f"Estado del Guardián de Visión: {status_str}. Intervalo de escaneo actual: cada {interval} segundos."
+
+
+def reload_state():
+    """Dummy function to avoid reload_state import errors, since state is loaded on every loop tick anyway."""
+    pass

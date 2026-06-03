@@ -18,8 +18,8 @@ class AudioPipeline:
                  chunk_size: int = CHUNK_SIZE,
                  vosk_model_path: str = "config/vosk_model",
                  wake_keywords: Optional[list[str]] = None,
-                 rms_threshold: float = 0.003,
-                 voice_name: str = "PalomaNeural",
+                 rms_threshold: float = 0.0005,
+                 voice_name: str = "Zephyr",
                  speech_rate: float = 1.0):
         self.sample_rate = sample_rate
         self.channels = channels
@@ -45,6 +45,10 @@ class AudioPipeline:
         self._max_buffer_sec: float = 15.0
         self._max_buffer_samples: int = int(sample_rate * self._max_buffer_sec)
         self._is_sleeping: bool = True
+        
+        # Silence hangover for low-latency auto-flush
+        self._silence_samples: int = 0
+        self._silence_limit_samples: int = int(sample_rate * 1.0)
 
     @property
     def is_sleeping(self) -> bool:
@@ -52,37 +56,52 @@ class AudioPipeline:
 
     def wake(self):
         self._is_sleeping = False
+        self._silence_samples = 0
 
     def sleep(self):
         self._is_sleeping = True
         self._buffer.clear()
         self._buffer_len = 0
+        self._silence_samples = 0
 
-    def process_chunk(self, indata: np.ndarray) -> dict[str, Any]:
+    def process_chunk(self, indata: np.ndarray, accumulate: bool = True) -> dict[str, Any]:
         result = {"action": "silence", "rms": 0.0, "wake_word": None}
 
         voice, rms = self.vad.is_speech(indata)
         result["rms"] = rms
 
-        if not voice:
+        if self._is_sleeping:
+            if not voice:
+                return result
+            audio_bytes = indata.tobytes()
+            if self.wake_word.available:
+                ww = self.wake_word.detect(audio_bytes)
+                if ww:
+                    result["action"] = "wake"
+                    result["wake_word"] = ww
+                    self.wake()
+                    self.wake_word.reset()
             return result
 
-        audio_bytes = indata.tobytes()
-
-        if self._is_sleeping and self.wake_word.available:
-            ww = self.wake_word.detect(audio_bytes)
-            if ww:
-                result["action"] = "wake"
-                result["wake_word"] = ww
-                self.wake()
-                self.wake_word.reset()
-            return result
-
-        if not self._is_sleeping:
-            self._accumulate(indata)
-            result["action"] = "accumulate"
-            if self._buffer_len >= self._max_buffer_samples:
-                result["action"] = "overflow"
+        if voice:
+            self._silence_samples = 0
+            if accumulate:
+                self._accumulate(indata)
+                result["action"] = "accumulate"
+                if self._buffer_len >= self._max_buffer_samples:
+                    result["action"] = "overflow"
+            else:
+                result["action"] = "speech"
+        else:
+            if accumulate and self._buffer_len > 0:
+                self._accumulate(indata)
+                self._silence_samples += len(indata)
+                if self._silence_samples >= self._silence_limit_samples:
+                    result["action"] = "flush"
+                else:
+                    result["action"] = "accumulate"
+            else:
+                result["action"] = "silence"
 
         return result
 
@@ -93,6 +112,7 @@ class AudioPipeline:
         text = self.stt.transcribe(audio)
         self._buffer.clear()
         self._buffer_len = 0
+        self._silence_samples = 0
         return text
 
     def _accumulate(self, indata: np.ndarray):

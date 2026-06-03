@@ -233,15 +233,15 @@ exit /b 0
 :: =============================================================================
 :banner
 echo.
-echo %PURPLE%=======================================================================%RESET%
-echo %PURPLE%                                                                       %RESET%
-echo %PURPLE%             M   M   III   N   N                                     %RESET%
-echo %PURPLE%             MM MM    I    NN  N                                     %RESET%
-echo %PURPLE%             M M M    I    N N N                                     %RESET%
-echo %PURPLE%             M   M    I    N  NN                                     %RESET%
-echo %PURPLE%             M   M   III   N   N                                     %RESET%
-echo %PURPLE%                                                                       %RESET%
-echo %GREEN%               Asistente de Inteligencia Artificial                    %RESET%
-echo %PURPLE%=======================================================================%RESET%
+echo %PURPLE%=============================================%RESET%
+echo %PURPLE%                                            %RESET%
+echo %PURPLE%             M   M   III   N   N            %RESET%
+echo %PURPLE%             MM MM    I    NN  N            %RESET%
+echo %PURPLE%             M M M    I    N N N            %RESET%
+echo %PURPLE%             M   M    I    N  NN            %RESET%
+echo %PURPLE%             M   M   III   N   N            %RESET%
+echo %PURPLE%                                            %RESET%
+echo %GREEN%     Asistente de Inteligencia Artificial    %RESET%
+echo %PURPLE%=============================================%RESET%
 echo.
 goto :eof

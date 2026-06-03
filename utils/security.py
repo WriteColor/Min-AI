@@ -11,7 +11,7 @@ Proporciona:
 - Rate limiting
 """
 
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import hashlib
 import hmac
 import secrets

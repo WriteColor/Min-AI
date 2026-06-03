@@ -3,6 +3,10 @@ core/interfaces.py — Standard Interfaces for Module Communication
 ============================================================
 Defines abstract interfaces for communication between modules.
 Ensures loose coupling and high cohesion across the architecture.
+
+⚠️  DEPRECATED — These interfaces are not currently implemented or imported.
+    The active architecture uses ActionDispatcher + TOOL_DECLARATIONS instead.
+    This file is kept as architectural reference / documentation.
 """
 
 from abc import ABC, abstractmethod

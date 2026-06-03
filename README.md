@@ -32,12 +32,14 @@
 | Nivel 3 | `self_edit.py` | Lista negra de archivos protegidos inmutables |
 
 ### 🎨 Interfaz Moderna
-- **Tauri + React + TypeScript** con Tailwind CSS v4
+- **Tauri 2.x + Next.js 14 (App Router) + TypeScript** con Tailwind CSS v4
 - Componentes shadcn-style con Radix UI primitives
 - Orb 3D interactivo con Three.js que reacciona al estado del asistente
 - Widgets auto-ocultables: Clima, Reloj, Música, Tareas, Favoritos
 - Control bar minimalista con auto-hide en hover
-- Settings dialog completo con 5 pestañas y dropdowns reales del sistema
+- Settings dialog completo con 6 pestañas, enumeración de dispositivos de cámara, y dropdowns reales del sistema
+- Sistema de archivos externo seguro con validación de rutas (path traversal protection)
+- Configuración con fallback de 3 capas (Tauri → API → public/config)
 
 ### 🌤️ Clima y Geolocalización
 - Geolocalización automática por IP o configuración manual
@@ -78,32 +80,37 @@ MIN/
 │   ├── volume_control.py   # Control de volumen
 │   └── ...                 # 20+ módulos de acciones
 ├── Min-UI/
-│   ├── src/
-│   │   ├── App.tsx         # Componente principal (~130 líneas)
-│   │   ├── hooks/
-│   │   │   └── useWebSocket.ts  # Hook completo de comunicación
-│   │   ├── components/
-│   │   │   ├── Orb.tsx          # Esfera 3D interactiva (Three.js)
-│   │   │   ├── ControlBar.tsx   # Barra de control auto-hide
-│   │   │   ├── WidgetDock.tsx   # Dock de widgets lateral
-│   │   │   ├── StatusDot.tsx    # Indicador de conexión
-│   │   │   ├── SettingsDialog.tsx # Configuración completa
-│   │   │   ├── ui/             # Componentes shadcn-style
-│   │   │   │   ├── button.tsx
-│   │   │   │   ├── input.tsx
-│   │   │   │   ├── dialog.tsx
-│   │   │   │   └── select.tsx
-│   │   │   └── widgets/
-│   │   │       ├── WeatherWidget.tsx
-│   │   │       ├── MusicWidget.tsx
-│   │   │       ├── ClockWidget.tsx
-│   │   │       ├── TodoWidget.tsx
-│   │   │       └── FavoritesWidget.tsx
-│   │   ├── types/
-│   │   │   └── index.ts     # TypeScript interfaces (0 `any`)
-│   │   └── lib/
-│   │       └── utils.ts     # cn() utility
-│   └── src-tauri/           # Configuración Tauri (Rust)
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── config/route.ts  # API de configs (GET/POST)
+│   │   │   └── files/route.ts  # API de archivos externos (GET/POST/DELETE)
+│   │   ├── page.tsx             # Componente principal
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── SettingsDialog.tsx  # 6 pestañas, dispositivos reales
+│   │   ├── ControlBar.tsx       # File picker (input type="file")
+│   │   ├── Chat.tsx            # Soporte multi-file upload
+│   │   ├── Orb.tsx             # Esfera 3D interactiva
+│   │   ├── SidebarDock.tsx     # Dock de widgets
+│   │   ├── StatusDot.tsx       # Indicador de conexión
+│   │   ├── ui/                  # Componentes shadcn-style
+│   │   └── widgets/
+│   │       ├── WeatherWidget.tsx
+│   │       ├── MusicWidget.tsx  # Visualizador 12-bar
+│   │       ├── ClockWidget.tsx
+│   │       ├── TodoWidget.tsx   # Layout apilado
+│   │       └── FavoritesWidget.tsx
+│   ├── hooks/
+│   │   ├── useWebSocket.ts     # Hook completo WS
+│   │   ├── use-mobile.ts       # Viewport móvil
+│   │   └── use-toast.ts       # Notificaciones toast
+│   ├── lib/
+│   │   ├── config-loader.ts   # 3 capas fallback
+│   │   └── file-access.ts     # Validación de rutas
+│   ├── types/
+│   │   └── index.ts           # TypeScript (sin `any`)
+│   └── src-tauri/
+│       └── main.rs             # Comandos Rust (7 commands)
 └── logs/
     └── security_audit.log   # Auditoría de seguridad
 ```
@@ -139,6 +146,16 @@ MIN.bat kill         # Cerrar instancias de MIN (selectivo)
 MIN.bat status       # Verificar estado de procesos y archivos
 MIN.bat dev          # Modo desarrollo con hot-reload
 MIN.bat help         # Mostrar ayuda
+```
+
+### Scripts NPM (Min-UI)
+```bash
+pnpm dev            # Desarrollo web (Next.js)
+pnpm tauri:dev      # Desarrollo Tauri completo
+pnpm tauri:build    # Build Tauri (requiere Cargo en PATH)
+pnpm ui:dev         # Alias para dev
+pnpm ui:build       # Alias para build
+pnpm lint           # ESLint
 ```
 
 ---

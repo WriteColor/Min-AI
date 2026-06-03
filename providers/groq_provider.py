@@ -69,7 +69,7 @@ class GroqProvider(MultimodalProvider):
             
             self._client = AsyncGroq(
                 api_key=self.config.api_key,
-                base_url=self.config.base_url or "https://api.groq.com/openai/v1"
+                base_url=self.config.base_url or "https://api.groq.com"
             )
             self._is_connected = True
             return True

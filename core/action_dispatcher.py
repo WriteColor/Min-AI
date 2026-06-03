@@ -32,7 +32,8 @@ CATEGORIES = ["automation", "files", "media", "music", "system", "utils", "visio
 
 # Special function name or module mappings
 SPECIAL_MAPPINGS = {
-    "weather_report": ("automation.weather_report", "weather_action"),
+    # weather_report function was renamed from weather_action to match schema name
+    "weather_report": ("automation.weather_report", "weather_report"),
     "desktop_control": ("system.desktop", "desktop_control"),
     "screen_process": ("vision.screen_vision", "screen_vision"),
     "screen_vision": ("vision.screen_vision", "screen_vision"),
@@ -116,7 +117,14 @@ class ActionDispatcher:
             traceback.print_exc()
             if self.speak_fn:
                 try:
-                    self.speak_fn(f"Error al ejecutar {name}: {str(e)}")
+                    # Check TTS guard to avoid overlapping error speech
+                    if hasattr(self.speak_fn, '__self__') and hasattr(self.speak_fn.__self__, '_is_speaking'):
+                        if self.speak_fn.__self__._is_speaking:
+                            pass  # Skip error speak if TTS is already playing
+                        else:
+                            self.speak_fn(f"Error al ejecutar {name}: {str(e)}")
+                    else:
+                        self.speak_fn(f"Error al ejecutar {name}: {str(e)}")
                 except:
                     pass
             return f"Tool '{name}' failed: {e}"

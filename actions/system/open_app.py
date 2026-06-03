@@ -5,7 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 REGISTRY_FILE = BASE_DIR / "config" / "app_registry.json"
 
 

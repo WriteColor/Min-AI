@@ -12,7 +12,7 @@ import sounddevice as sd
 class AudioService:
     def __init__(self, ui, tts_service, get_llm_provider=None, get_api_key=None,
                  get_live_model=None, vosk_recognizer=None, local_command_queue=None):
-        self.ui = ui
+        self._ui = ui
         self.tts_service = tts_service
 
         # Session & loop — assigned when connection is opened
@@ -34,6 +34,7 @@ class AudioService:
 
         # Internal state
         self._last_speak_time = 0.0
+        self._last_user_speech_time = 0.0
         self._api_1011_tool = None
         self._first_chunk_flag = True
 
@@ -91,66 +92,117 @@ class AudioService:
                     if self.vosk_recognizer.AcceptWaveform(audio_data):
                         res = json.loads(self.vosk_recognizer.Result())
                         text = res.get("text", "")
+                        from services.audio.stt import sanitize_vosk_text
+                        text = sanitize_vosk_text(text)
                         if "min" in text.lower():
                             self.is_sleeping = False
-                            self.ui.set_state("LISTENING")
-                            self.ui.write_log("SYS: \U0001f7e0 \u00a1Despierto!")
+                            self._ui.set_state("LISTENING")
+                            self._ui.write_log("SYS: \U0001f7e0 \u00a1Despierto!")
                             try:
                                 import winsound
                                 winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
                             except:
                                 pass
+                            if provider == "gemini":
+                                self.vosk_recognizer = None
+                                from services.audio.stt import _MODEL_CACHE
+                                _MODEL_CACHE.clear()
+                                import gc
+                                gc.collect()
+                                print("[MIN] Vosk model unloaded and memory freed after wake-word detection")
                 return
 
             is_cooling_down = (now - getattr(self, "_last_speak_time", 0.0)) < 0.8
-            if not min_speaking and not is_cooling_down and not self.ui.muted:
-                from services.audio.pipeline import AudioPipeline
-                if not hasattr(self, "audio_pipeline"):
-                    self.audio_pipeline = AudioPipeline()
+            if not min_speaking and not is_cooling_down and not self._ui.muted:
+                if provider == "gemini":
+                    # --- NATIVE GEMINI LIVE DYNAMIC NOISE GATE (FROM ORIGINAL REPO) ---
+                    rms = 0.0
+                    try:
+                        rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
+                        self._ui.set_audio_level(min(1.0, rms * 18))
+                    except Exception:
+                        pass
 
-                result = self.audio_pipeline.process_chunk(indata)
-                rms = result.get("rms", 0.0)
-                action = result.get("action", "silence")
-                self.ui.set_audio_level(min(1.0, rms * 18))
+                    from core.config_manager import get_config
+                    cfg = get_config()
+                    threshold = getattr(cfg, "mic_sensitivity", 0.003)
 
-                if action == "overflow":
-                    text = self.audio_pipeline.flush_buffer()
-                    if text:
-                        self.ui.write_log(f"Tú (STT Local): {text}")
-                        loop.call_soon_threadsafe(self._local_command_queue.put_nowait, text)
-                elif action == "wake":
-                    ww = result.get("wake_word")
-                    if ww:
-                        self.ui.write_log(f"SYS: ¡Wake word '{ww}' detectado!")
-                        self.is_sleeping = False
-                        self.ui.set_state("LISTENING")
-                        try:
-                            import winsound
-                            winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
-                        except Exception:
-                            pass
+                    # Initialize rolling noise floor (minimum RMS of the last 5 seconds)
+                    if not hasattr(self, "_noise_floor_samples"):
+                        self._noise_floor_samples = []
+                        self._last_noise_floor_update = now
 
-                if provider != "gemini" and getattr(self, "vosk_recognizer", None) and action in ("accumulate", "silence"):
-                    audio_bytes = indata.tobytes()
-                    if self.vosk_recognizer.AcceptWaveform(audio_bytes):
-                        res = json.loads(self.vosk_recognizer.Result())
-                        text = res.get("text", "").strip()
+                    # Sample every 100ms
+                    if now - getattr(self, "_last_noise_floor_update", 0.0) > 0.1:
+                        self._noise_floor_samples.append(rms)
+                        self._last_noise_floor_update = now
+                        if len(self._noise_floor_samples) > 50:
+                            self._noise_floor_samples.pop(0)
+                        self._ambient_noise_floor = min(self._noise_floor_samples)
+
+                    ambient_floor = getattr(self, "_ambient_noise_floor", 0.001)
+
+                    if threshold < 0.0012:
+                        dynamic_threshold = threshold
+                    else:
+                        dynamic_threshold = max(threshold, ambient_floor * 1.3)
+
+                    if rms > dynamic_threshold:
+                        self._last_user_speech_time = now
+
+                    # Transmit package if within 0.8s hangover time
+                    if now - self._last_user_speech_time < 0.8:
+                        data = indata.tobytes()
+                        def _safe_put(q, item):
+                            try:
+                                q.put_nowait(item)
+                            except Exception:
+                                pass
+                        loop.call_soon_threadsafe(
+                            _safe_put, self.out_queue, {"data": data, "mime_type": "audio/pcm"}
+                        )
+                else:
+                    # --- LOCAL/HYBRID PIPELINE FOR OTHER PROVIDERS ---
+                    from services.audio.pipeline import AudioPipeline
+                    if not hasattr(self, "audio_pipeline"):
+                        self.audio_pipeline = AudioPipeline()
+
+                    result = self.audio_pipeline.process_chunk(indata, accumulate=True)
+                    rms = result.get("rms", 0.0)
+                    action = result.get("action", "silence")
+                    self._ui.set_audio_level(min(1.0, rms * 18))
+
+                    if action in ("overflow", "flush"):
+                        text = self.audio_pipeline.flush_buffer()
                         if text:
-                            self.ui.write_log(f"Tú (Voz Local): {text}")
+                            self._ui.write_log(f"Tú (STT Local): {text}")
                             loop.call_soon_threadsafe(self._local_command_queue.put_nowait, text)
-                elif provider == "gemini" and action in ("accumulate", "silence"):
-                    def _safe_put(q, item):
-                        try:
-                            q.put_nowait(item)
-                        except Exception:
-                            pass
-                    loop.call_soon_threadsafe(
-                        _safe_put, self.out_queue, {"data": indata.tobytes(), "mime_type": "audio/pcm"}
-                    )
+                    elif action == "wake":
+                        ww = result.get("wake_word")
+                        if ww:
+                            self._ui.write_log(f"SYS: ¡Wake word '{ww}' detectado!")
+                            self.is_sleeping = False
+                            self._ui.set_state("LISTENING")
+                            try:
+                                import winsound
+                                winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                            except Exception:
+                                pass
+
+                    if getattr(self, "vosk_recognizer", None) and action in ("accumulate", "silence"):
+                        audio_bytes = indata.tobytes()
+                        if self.vosk_recognizer.AcceptWaveform(audio_bytes):
+                            res = json.loads(self.vosk_recognizer.Result())
+                            text = res.get("text", "").strip()
+                            from services.audio.stt import sanitize_vosk_text
+                            text = sanitize_vosk_text(text)
+                            if text:
+                                self._ui.write_log(f"Tú (Voz Local): {text}")
+                                loop.call_soon_threadsafe(self._local_command_queue.put_nowait, text)
             elif min_speaking:
                 try:
                     rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
-                    self.ui.set_audio_level(min(1.0, rms * 15))
+                    self._ui.set_audio_level(min(1.0, rms * 15))
                 except Exception:
                     pass
 
@@ -159,7 +211,7 @@ class AudioService:
                 samplerate=16000,
                 channels=1,
                 dtype="int16",
-                blocksize=256,
+                blocksize=320,
                 callback=callback,
             ):
                 print("[MIN] Mic stream open")
@@ -193,9 +245,9 @@ class AudioService:
                             if txt:
                                 out_buf.append(txt)
                                 if _first_chunk:
-                                    self.ui.clear_min_response()
+                                    self._ui.clear_min_response()
                                     _first_chunk = False
-                                self.ui.stream_min_chunk(txt)
+                                self._ui.stream_min_chunk(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
                             txt = _clean_transcript(sc.input_transcription.text)
@@ -208,7 +260,7 @@ class AudioService:
                                 self._turn_done_event.set()
                             full_in = " ".join(in_buf).strip()
                             if full_in:
-                                self.ui.write_log(f"T\u00fa: {full_in}")
+                                self._ui.write_log(f"T\u00fa: {full_in}")
                                 if self._fire_phrase_triggers_func:
                                     self._fire_phrase_triggers_func(full_in)
                             in_buf = []
@@ -219,24 +271,36 @@ class AudioService:
                         txt = response.text
                         if txt:
                             if _first_chunk:
-                                self.ui.clear_min_response()
+                                self._ui.clear_min_response()
                                 _first_chunk = False
                             out_buf.append(txt)
-                            self.ui.stream_min_chunk(txt)
+                            self._ui.stream_min_chunk(txt)
 
                     if response.tool_call:
-                        self.ui.clear_min_response()
+                        self._ui.clear_min_response()
                         _first_chunk = True
                         fcs = response.tool_call.function_calls
                         for fc in fcs:
                             print(f"[MIN] Tool call: {fc.name}")
                             _last_tool = fc.name
 
+                        from google.genai import types
+
                         if len(fcs) > 1:
                             tasks = [asyncio.create_task(self._execute_tool_func(fc)) for fc in fcs]
-                            fn_responses = list(await asyncio.gather(*tasks))
+                            raw_responses = list(await asyncio.gather(*tasks))
                         else:
-                            fn_responses = [await self._execute_tool_func(fcs[0])]
+                            raw_responses = [await self._execute_tool_func(fcs[0])]
+
+                        fn_responses = [
+                            types.FunctionResponse(
+                                id=fc.id,
+                                name=fc.name,
+                                response=resp if isinstance(resp, dict) else {"result": str(resp)}
+                            )
+                            for fc, resp in zip(fcs, raw_responses)
+                        ]
+
                         try:
                             await self.session.send_tool_response(
                                 function_responses=fn_responses
@@ -253,11 +317,13 @@ class AudioService:
                             else:
                                 text = str(fn_resp.response) if fn_resp.response else ''
                             if text and isinstance(text, str) and len(text) > 1:
-                                self.ui.clear_min_response()
-                                self.ui.stream_min_chunk(text)
-                                self.ui.broadcast({"type": "text", "value": text})
-                                if not self.ui.muted:
-                                    asyncio.create_task(self.tts_service.speak_local(text))
+                                self._ui.clear_min_response()
+                                self._ui.stream_min_chunk(text)
+                                self._ui.broadcast({"type": "text", "value": text})
+                                # Commented out to prevent duplicate voice output.
+                                # Gemini Live natively handles describing the tool execution outcome.
+                                # if not self._ui.muted and not self.tts_service._is_speaking:
+                                #     asyncio.create_task(self.tts_service.speak_local(text))
         except Exception as e:
             msg = str(e)
             code = getattr(e, "status_code", 0) or getattr(e, "code", 0) or 0
@@ -303,7 +369,7 @@ class AudioService:
                             try:
                                 play_data = np.frombuffer(buffered, dtype=np.int16)
                                 rms = float(np.sqrt(np.mean(play_data.astype(np.float32) ** 2))) / 32768.0
-                                self.ui.set_audio_level(min(1.0, rms * 25))
+                                self._ui.set_audio_level(min(1.0, rms * 25))
                             except Exception:
                                 pass
                             await asyncio.to_thread(stream.write, buffered)
@@ -324,7 +390,7 @@ class AudioService:
                     try:
                         play_data = np.frombuffer(buffered, dtype=np.int16)
                         rms = float(np.sqrt(np.mean(play_data.astype(np.float32) ** 2))) / 32768.0
-                        self.ui.set_audio_level(min(1.0, rms * 25))
+                        self._ui.set_audio_level(min(1.0, rms * 25))
                     except Exception:
                         pass
                     await asyncio.to_thread(stream.write, buffered)
@@ -345,10 +411,10 @@ class AudioService:
         try:
             p = Path(path)
             if not p.exists():
-                self.ui.write_log(f"\u274c Archivo no encontrado: {path}")
+                self._ui.write_log(f"\u274c Archivo no encontrado: {path}")
                 return
 
-            self.ui.set_state("THINKING")
+            self._ui.set_state("THINKING")
             client = genai.Client(api_key=api_key)
 
             loop = asyncio.get_event_loop()
@@ -366,13 +432,13 @@ class AudioService:
                 return response.text
 
             resp_text = await loop.run_in_executor(None, _analyze)
-            self.ui.write_log("\U0001f508 An\u00e1lisis de archivo de audio completado.")
-            self.ui.clear_min_response()
-            self.ui.stream_min_chunk(resp_text)
+            self._ui.write_log("\U0001f508 An\u00e1lisis de archivo de audio completado.")
+            self._ui.clear_min_response()
+            self._ui.stream_min_chunk(resp_text)
 
             await self.tts_service.speak_local(resp_text)
         except Exception as e:
-            self.ui.write_log(f"\u274c Error procesando audio: {e}")
+            self._ui.write_log(f"\u274c Error procesando audio: {e}")
             traceback.print_exc()
 
-        self.ui.set_state("LISTENING")
+        self._ui.set_state("LISTENING")

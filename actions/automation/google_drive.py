@@ -14,7 +14,7 @@ try:
 except ImportError:
     GOOGLE_LIBS_AVAILABLE = False
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CREDENTIALS_FILE = BASE_DIR / "config" / "credentials.json"
 TOKEN_FILE = BASE_DIR / "config" / "token.json"
 LOCAL_DRIVE_DIR = Path(os.path.expanduser("~/Pictures/MIN Drive")).resolve()

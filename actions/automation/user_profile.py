@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PROFILE_PATH = BASE_DIR / "config" / "user_profile.json"
 
 def user_profile(parameters: dict, player=None) -> str:

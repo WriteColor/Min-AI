@@ -9,7 +9,8 @@ from mss import mss
 from PIL import Image
 import io
 
-API_FILE = Path("config/config.json")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+API_FILE = BASE_DIR / "config" / "config.json"
 
 def _get_api_key() -> str:
     try:

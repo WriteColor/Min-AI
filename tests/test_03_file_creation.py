@@ -5,6 +5,7 @@ Prueba creación de: txt, markdown (LaTeX/KaTeX), Word, Excel, PowerPoint
 """
 
 import asyncio
+import json
 import sys
 import os
 from pathlib import Path

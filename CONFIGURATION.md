@@ -1,13 +1,93 @@
 # JARVIS AI - Configuration Reference
 
-> **Last updated:** 2025-05-31
+> **Last updated:** 2026-05-31
 
 ---
 
-## Config File Location
+## Config File Locations
 
-- **Runtime**: `config/config.json`
-- **Template**: `config/config.example.json`
+| Archivo | Descripción | Ubicación |
+|---------|-------------|-----------|
+| Runtime config | `config.json` | `C:/React-Nextjs-Projects/Jarvis AI/config/` |
+| Template | `config.example.json` | `C:/React-Nextjs-Projects/Jarvis AI/config/` |
+| Fallback (web dev) | `*.json` | `Min-UI/public/config/` |
+
+### Archivos de Configuración (9 archivos)
+
+| Archivo | Descripción |
+|---------|-------------|
+| `config.json` | Configuración runtime (API keys, modelo activo) |
+| `accessibility_config.json` | Configuración de accesibilidad |
+| `app_registry.json` | Caché de rutas de aplicaciones |
+| `favorites.json` | Sitios favoritos |
+| `morning_brief_state.json` | Estado del briefing matutino |
+| `routines.json` | Rutinas de automatización |
+| `rules.json` | Reglas de automatización |
+| `user_profile.json` | Perfil de usuario |
+| `vision_guardian_state.json` | Estado de Vision Guardian |
+
+---
+
+## API Routes de Configuración
+
+### GET/POST `/api/config`
+
+```typescript
+// GET - Lee todos los archivos de configuración
+// Response: { configs: { "config.json": {...}, ... } }
+
+// POST - Guarda un archivo de configuración
+// Body: { fileName: string, content: string }
+```
+
+### GET/POST/DELETE `/api/files`
+
+Acceso seguro a archivos externos (con validación de path traversal):
+
+```typescript
+// GET /api/files?path=config.json
+// Response: { success: true, content: "...", path: "..." }
+
+// POST /api/files
+// Body: { filePath: string, content: string, baseDirKey?: "config"|"jarvis"|"documents"|"downloads" }
+// Response: { success: true, path: "..." }
+
+// DELETE /api/files?path=config.json
+// Response: { success: true, path: "..." }
+```
+
+### Validación de Rutas (`lib/file-access.ts`)
+
+```typescript
+ALLOWED_BASE_DIRS = {
+  config:    "C:/React-Nextjs-Projects/Jarvis AI/config",
+  jarvis:    "C:/React-Nextjs-Projects/Jarvis AI",
+  documents: "C:/Users/Jerem/Documents",
+  downloads: "C:/Users/Jerem/Downloads",
+};
+
+ALLOWED_EXTENSIONS = [".json", ".txt", ".md", ".csv", ".yaml", ".yml"];
+```
+
+---
+
+## Flujo de Configuración (3 Capas)
+
+```
+Lectura:
+  Tauri? → invoke("read_config_file") → Rust fs
+  Web?   → /api/config GET → Node.js fs
+             ↓ si falla
+           /config/*.json (public/)
+
+Escritura:
+  Tauri? → invoke("save_config_json") → Rust fs
+              ↓ si falla
+            ws.saveConfig() → WebSocket → Python
+  Web?   → /api/files POST → Node.js fs
+              ↓ si falla
+            ws.saveConfig() → WebSocket → Python
+```
 
 ---
 

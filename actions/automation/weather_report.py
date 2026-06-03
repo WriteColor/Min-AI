@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CONFIG_FILE = BASE_DIR / "config" / "config.json"
 
 _WEATHER_MAP = {
@@ -335,7 +335,7 @@ def fetch_weather_data(parameters: dict | None = None) -> dict:
         "forecast": forecast,
     }
 
-def weather_action(parameters: dict, player=None) -> str:
+def weather_report(parameters: dict, player=None) -> str:
     data = fetch_weather_data(parameters)
     if data.get("error"):
         return f"Error: {data.get('error')} Configura manualmente 'location_city' en config/config.json."

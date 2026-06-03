@@ -70,23 +70,27 @@ class GeminiProvider(MultimodalProvider):
         return "Google Gemini"
     
     async def connect(self) -> bool:
-        """Initialize Gemini API connection."""
+        """Initialize Gemini API connection using google.genai (new SDK)."""
         try:
-            import google.generativeai as genai
-            
-            genai.configure(api_key=self.config.api_key)
-            self._client = genai.GenerativeModel(self._model)
+            from google import genai
+
+            self._client = genai.Client(api_key=self.config.api_key)
+            # Verify credentials with a lightweight call
+            try:
+                self._client.models.list(page_size=1)
+            except Exception:
+                pass  # Auth error will surface in send_text
             self._is_connected = True
             return True
         except Exception as e:
             print(f"[Gemini] Connection error: {e}")
             return False
-    
+
     async def disconnect(self):
         """Close Gemini connection."""
         self._client = None
         self._is_connected = False
-    
+
     async def send_text(
         self,
         text: str,
@@ -95,42 +99,34 @@ class GeminiProvider(MultimodalProvider):
         """Send text and get response."""
         if not self._client:
             raise RuntimeError("Provider not connected")
-        
+
         try:
-            generation_config = {
+            config = {
                 "temperature": self.config.temperature,
                 "max_output_tokens": self.config.max_tokens,
             }
-            
+
             if tools:
                 # Convert tools to Gemini format
-                gemini_tools = []
-                for tool in tools:
-                    gemini_tools.append({
-                        "function_declarations": [
-                            {
-                                "name": tool.get("name"),
-                                "description": tool.get("description", ""),
-                                "parameters": tool.get("parameters", {"type": "object", "properties": {}})
-                            }
-                        ]
-                    })
-                
-                response = await asyncio.to_thread(
-                    self._client.generate_content,
-                    text,
-                    generation_config=generation_config,
-                    tools=gemini_tools
-                )
-            else:
-                response = await asyncio.to_thread(
-                    self._client.generate_content,
-                    text,
-                    generation_config=generation_config
-                )
-            
-            return response.text
-            
+                gemini_tools = [{
+                    "function_declarations": [
+                        {
+                            "name": tool.get("name"),
+                            "description": tool.get("description", ""),
+                            "parameters": tool.get("parameters", {"type": "object", "properties": {}})
+                        }
+                    for tool in tools
+                ]}]
+                config["tools"] = gemini_tools
+
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=text,
+                config=config
+            )
+
+            return response.text or ""
+
         except Exception as e:
             print(f"[Gemini] send_text error: {e}")
             return f"Error: {str(e)}"
@@ -141,18 +137,15 @@ class GeminiProvider(MultimodalProvider):
             raise RuntimeError("Provider not connected")
         
         try:
-            response = await asyncio.to_thread(
-                self._client.generate_content,
+            response = self._client.models.generate_content(
+                model=self._model,
                 contents=[
-                    {
-                        "mime_type": mime_type,
-                        "data": audio_data
-                    },
+                    {"mime_type": mime_type, "data": audio_data},
                     "Transcribir y responder a este audio."
                 ]
             )
-            
-            return response.text
+
+            return response.text or ""
             
         except Exception as e:
             print(f"[Gemini] send_audio error: {e}")
@@ -194,21 +187,17 @@ class GeminiProvider(MultimodalProvider):
         """Analyze image and return description."""
         if not self._client:
             raise RuntimeError("Provider not connected")
-        
+
         try:
-            from google.generativeai import GenerativeModel
-            
-            model = GenerativeModel(self._model)
-            response = await asyncio.to_thread(
-                model.generate_content,
-                [prompt, image_data]
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=[prompt, image_data]
             )
-            
-            return response.text
-            
+            return response.text or ""
+
         except Exception as e:
             return f"Vision error: {str(e)}"
-    
+
     async def stream_text(
         self,
         text: str,
@@ -217,24 +206,36 @@ class GeminiProvider(MultimodalProvider):
         """Stream response chunks."""
         if not self._client:
             raise RuntimeError("Provider not connected")
-        
+
         try:
-            generation_config = {
+            config = {
                 "temperature": self.config.temperature,
                 "max_output_tokens": self.config.max_tokens,
             }
-            
-            response = await asyncio.to_thread(
-                self._client.generate_content,
-                text,
-                generation_config=generation_config,
+
+            if tools:
+                gemini_tools = [{
+                    "function_declarations": [
+                        {
+                            "name": tool.get("name"),
+                            "description": tool.get("description", ""),
+                            "parameters": tool.get("parameters", {"type": "object", "properties": {}})
+                        }
+                    for tool in tools
+                ]}]
+                config["tools"] = gemini_tools
+
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=text,
+                config=config,
                 stream=True
             )
-            
+
             for chunk in response:
                 if chunk.text:
                     yield chunk.text
-                    
+
         except Exception as e:
             yield f"Error: {str(e)}"
 

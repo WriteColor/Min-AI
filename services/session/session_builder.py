@@ -37,12 +37,25 @@ class SessionBuilder:
 
         cfg = get_config()
         _voice_name = cfg.min_voice or "Aoede"
+        # Map configured voice to Gemini Live supported voices (Aoede, Charon, Fenrir, Kore, Puck)
+        # to ensure gender and tone consistency between local TTS and Gemini.
+        gemini_voice_map = {
+            "Aoede": "Aoede",
+            "Kore": "Kore",
+            "Leda": "Kore",      # Leda is female, maps to Kore (female)
+            "Zephyr": "Charon",  # Zephyr is male, maps to Charon (male)
+            "Charon": "Charon",
+            "Puck": "Puck",
+            "Fenrir": "Fenrir",
+            "Orus": "Fenrir"     # Orus is male, maps to Fenrir (male)
+        }
+        gemini_voice = gemini_voice_map.get(_voice_name, "Aoede")
         _speech_cfg = None
         try:
             _speech_cfg = types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=_voice_name
+                        voice_name=gemini_voice
                     )
                 )
             )
@@ -50,7 +63,7 @@ class SessionBuilder:
             _speech_cfg = None
 
         cfg_kwargs: dict = dict(
-            response_modalities=["AUDIO"],
+            response_modalities=[cfg.voice_preference or "AUDIO"],
             output_audio_transcription=types.AudioTranscriptionConfig(),
             input_audio_transcription=types.AudioTranscriptionConfig(),
             system_instruction="\n".join(parts),
@@ -62,7 +75,7 @@ class SessionBuilder:
         try:
             cfg_kwargs["output_audio_config"] = types.OutputAudioConfig(
                 audio_encoding="LINEAR16",
-                speaking_rate=1.15,
+                speaking_rate=cfg.speech_rate or 1.0,
             )
         except Exception:
             pass

@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import psutil
+import subprocess
 import sys
 import threading
 import uuid
@@ -104,6 +105,8 @@ class MinUI:
 
         # Response buffer
         self.min_response_buffer = ""
+        from services._core.helpers import StreamingThinkFilter
+        self.think_filter = StreamingThinkFilter()
 
         # Connected WebSocket clients
         self._clients: set = set()
@@ -116,6 +119,7 @@ class MinUI:
         print("[MIN] Running in Headless WebSocket mode for Tauri.")
 
         threading.Thread(target=self.ensure_startup_shortcut, daemon=True).start()
+        threading.Thread(target=self.start_config_watcher, daemon=True).start()
 
     # ── Basic UI Methods ─────────────────────────────────────────────────
 
@@ -138,14 +142,21 @@ class MinUI:
                 self.muted = False
 
     def set_audio_level(self, level: float):
-        self.broadcast({"type": "volume", "value": level})
+        self.broadcast({"type": "volume", "level": level, "value": level})
 
     def clear_min_response(self):
         self.min_response_buffer = ""
+        if hasattr(self, "think_filter") and self.think_filter:
+            self.think_filter.reset()
         self.broadcast({"type": "log", "value": "MIN: [Clear]"})
 
     def stream_min_chunk(self, chunk: str):
-        text = chunk.replace("MIN:", "").strip()
+        filtered = chunk
+        if hasattr(self, "think_filter") and self.think_filter:
+            filtered = self.think_filter.process(chunk)
+            if not filtered:
+                return
+        text = filtered.replace("MIN:", "").strip()
         if text:
             if self.min_response_buffer:
                 self.min_response_buffer += " " + text
@@ -266,7 +277,7 @@ class MinUI:
         """Send weather data to newly connected client."""
         try:
             from actions.automation.weather_report import fetch_weather_data
-            data = fetch_weather_data({})
+            data = fetch_weather_data({})  # sync function — no await needed
             if not data.get("error"):
                 await websocket.send(json.dumps({"type": "weather", "data": data}))
         except Exception:
@@ -312,6 +323,12 @@ class MinUI:
 
             elif msg_type == "save_config":
                 await self._handle_save_config(data.get("config", {}))
+
+            elif msg_type == "reload_config":
+                from core.config_manager import get_config_manager
+                get_config_manager().reload()
+                self.broadcast_config()
+                self.write_log("SYS: Configuración recargada desde el disco.")
 
             elif msg_type == "set_file":
                 path_val = data.get("value", "").strip()
@@ -377,13 +394,15 @@ class MinUI:
                 os._exit(0)
 
             elif msg_type == "agent_restart":
+                CREATE_NO_WINDOW = 0x08000000
+
                 self.stop_gesture_thread()
                 self.broadcast({"type": "log", "value": "SYS: Reiniciando MIN..."})
                 try:
                     main_py = str(BASE_DIR / "main.py")
                     subprocess.Popen(
                         [sys.executable, main_py],
-                        creationflags=0x00000008
+                        creationflags=CREATE_NO_WINDOW
                     )
                 except Exception as e:
                     print(f"[WS] Restart error: {e}")
@@ -584,12 +603,20 @@ class MinUI:
         msg = json.dumps(data)
         async def do_send():
             if list(self._clients):
-                await asyncio.gather(
+                results = await asyncio.gather(
                     *[c.send(msg) for c in self._clients],
                     return_exceptions=True
                 )
+                for i, r in enumerate(results):
+                    if isinstance(r, Exception):
+                        client = list(self._clients)[i]
+                        print(f"[WS] broadcast send error to {client}: {r}")
         if self._ws_loop:
-            asyncio.run_coroutine_threadsafe(do_send(), self._ws_loop)
+            future = asyncio.run_coroutine_threadsafe(do_send(), self._ws_loop)
+            try:
+                future.result(timeout=5)
+            except Exception as e:
+                print(f"[WS] broadcast future error: {e}")
 
     # ── Startup Shortcut ───────────────────────────────────────────────────
 
@@ -631,6 +658,61 @@ class MinUI:
             print("[STARTUP] Shortcut ensured.")
         except Exception as e:
             print(f"[STARTUP] Error: {e}")
+
+    def start_config_watcher(self):
+        import time
+        last_mtimes = {}
+        time.sleep(2.0)
+        while True:
+            try:
+                if CONFIG_DIR.exists():
+                    changed = False
+                    for f in CONFIG_DIR.glob("*.json"):
+                        mtime = f.stat().st_mtime
+                        if f.name in last_mtimes:
+                            if mtime > last_mtimes[f.name]:
+                                print(f"[ConfigWatcher] Change detected in {f.name}")
+                                changed = True
+                        last_mtimes[f.name] = mtime
+                    
+                    if changed:
+                        from core.config_manager import get_config_manager
+                        get_config_manager().reload()
+                        self.broadcast_config()
+            except Exception as e:
+                print(f"[ConfigWatcher] Error in config watcher: {e}")
+            time.sleep(2.0)
+
+    def broadcast_config(self):
+        try:
+            cfg_path = CONFIG_DIR / "config.json"
+            cfg = {}
+            if cfg_path.exists():
+                try:
+                    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+
+            sub_configs = [
+                ("accessibility", "accessibility_config.json"),
+                ("vision_guardian", "vision_guardian_state.json"),
+                ("user_profile", "user_profile.json"),
+                ("app_registry", "app_registry.json"),
+            ]
+            for key, filename in sub_configs:
+                path = CONFIG_DIR / filename
+                if path.exists():
+                    try:
+                        cfg[key] = json.loads(path.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
+
+            self.broadcast({
+                "type": "log",
+                "value": f"config_loaded:{json.dumps(cfg)}"
+            })
+        except Exception as e:
+            print(f"[WS] Config broadcast error: {e}")
 
     # ── Camera Gestures ───────────────────────────────────────────────────
 
